@@ -168,6 +168,30 @@
         </div>
 
         <div class="field">
+          <span class="field__label" id="photoLabel">Foto del prodotto</span>
+          <div class="photo" id="photoBox" aria-labelledby="photoLabel">
+            <div class="photo__preview">
+              <img id="photoImg" alt="Anteprima della foto del prodotto" hidden>
+              <span class="photo__empty" id="photoEmpty">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                Nessuna foto
+              </span>
+              <span class="photo__busy" id="photoBusy" hidden>Preparazione…</span>
+            </div>
+            <div class="photo__side">
+              <div class="photo__actions">
+                <label class="btn btn--small photo__pick">
+                  <input type="file" id="fPhoto" accept="image/*" class="sr-only">
+                  <span id="photoPickLabel">Scegli foto</span>
+                </label>
+                <button type="button" class="btn btn--small photo__remove" id="photoRemove" hidden>Rimuovi</button>
+              </div>
+              <p class="field__hint" id="photoHint">Dal telefono puoi anche scattarla al momento. Viene ridotta e compressa automaticamente prima del salvataggio.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
           <label for="fTag">Etichetta</label>
           <input type="text" id="fTag" name="tag" maxlength="30" list="tagSuggestions" placeholder="es. Vegan, Signature">
           <datalist id="tagSuggestions">

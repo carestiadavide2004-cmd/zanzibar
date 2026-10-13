@@ -26,6 +26,7 @@
         categoria: c.name,
         voci: items.filter(function (v) { return v.categoryId === c.id; }).sort(byOrder).map(function (v) {
           return {
+            id: v.id,
             nome: v.name,
             desc: v.description || "",
             prezzo: Number(v.price) || 0,
@@ -57,6 +58,24 @@
     var items = null;
     var toList = function (snap) { return snap.docs.map(function (d) { return Object.assign({}, d.data(), { id: d.id }); }); };
     var update = function () { if (categories && items) site.setMenu(buildMenu(categories, items)); };
+
+    // Foto dei prodotti (collezione "photos", un documento per voce): lette una per volta,
+    // solo quando si apre la scheda di quel prodotto, e tenute in memoria per le riaperture.
+    var photoCache = {};
+    window.ZanzibarPhotos = {
+      get: function (id) {
+        if (!photoCache[id]) {
+          photoCache[id] = fs.getDoc(fs.doc(db, "photos", id)).then(function (snap) {
+            var data = snap.exists() ? snap.data().data : null;
+            return typeof data === "string" && data.indexOf("data:image/") === 0 ? data : null;
+          }, function (err) {
+            delete photoCache[id];   // errore di rete: riprova alla prossima apertura
+            throw err;
+          });
+        }
+        return photoCache[id];
+      }
+    };
 
     fs.onSnapshot(fs.collection(db, "categories"), function (snap) { categories = toList(snap); update(); }, fail);
     fs.onSnapshot(fs.collection(db, "items"), function (snap) { items = toList(snap); update(); }, fail);

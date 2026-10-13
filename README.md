@@ -10,14 +10,18 @@ Sito statico e leggerissimo, nessuna installazione. Il menu si gestisce dal **pa
 | `style.css` | Colori e stile (i colori principali sono in cima al file, in `:root`) |
 | `app.js` | Logica (tab categorie, pannello hamburger, galleria, mappa) |
 | `firebase-config.js` | Chiavi Firebase ed email del proprietario |
-| `firebase-menu.js` | Legge il menu da Firestore in tempo reale |
+| `firebase-menu.js` | Legge il menu da Firestore in tempo reale e, solo quando si apre la scheda di un prodotto, la sua foto |
 | `admin/` | Pannello di amministrazione (login + gestione categorie, piatti e bevande) |
 | `firestore.rules`, `firebase.json` | Regole di sicurezza del database e configurazione Firebase Hosting |
 
 ## Pannello di amministrazione
 Configurazione passo-passo in **`GUIDA-FIREBASE.md`**. Una volta configurato, apri `/admin`, accedi con
 email e password del proprietario e potrai aggiungere, modificare, riordinare ed eliminare categorie e voci
-(nome, descrizione, prezzo, etichetta, disponibilità).
+(nome, descrizione, prezzo, etichetta, disponibilità e foto).
+
+Le **foto dei prodotti** si scelgono nella modifica della voce (anche scattandole dal telefono): il pannello le riduce
+a 900px e le comprime in JPEG sotto i 150 KB, poi le salva nella collezione Firestore `photos` (un documento per voce,
+stesso ID). Sul sito si scaricano solo quando il cliente apre la scheda del prodotto; senza foto compare un segnaposto.
 
 Finché Firebase non è configurato, il sito mostra il menu scritto in `data.js`.
 

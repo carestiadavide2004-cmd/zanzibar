@@ -30,7 +30,10 @@
   var revealed = {};   // categorie già comparse: non rifanno l'animazione a ogni aggiornamento
   var io = null, reveal = null;
 
+  var currentMenu = [];
+
   function renderMenu(menu) {
+    currentMenu = menu;
     var activeId = current ? current.dataset.target : null;
 
     if (!menu.length) {
@@ -48,13 +51,14 @@
       return '<section class="cat" id="' + slug(c.categoria) + '">' +
         '<header class="cat-head"><span class="cat-num">' + pad(i + 1) + "</span>" +
         '<h2 class="cat-title">' + esc(c.categoria) + "</h2></header>" +
-        c.voci.map(function (v) {
+        c.voci.map(function (v, j) {
           var off = v.disponibile === false;
-          return '<article class="item' + (off ? " is-off" : "") + '">' +
+          return '<article class="item' + (off ? " is-off" : "") + '" data-c="' + i + '" data-v="' + j + '" role="button" tabindex="0" aria-haspopup="dialog" aria-label="' + esc(v.nome) + ': apri la scheda">' +
             '<div class="item-head">' +
               '<span class="item-name">' + esc(v.nome) + (v.tag ? '<span class="tag">' + esc(v.tag) + "</span>" : "") + "</span>" +
               '<span class="item-dots" aria-hidden="true"></span>' +
               '<span class="item-price">' + price(v.prezzo) + "</span>" +
+              '<svg class="item-more" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
             "</div>" +
             (v.desc ? '<p class="item-desc">' + esc(v.desc) + "</p>" : "") +
             (off ? '<p class="item-off">Non disponibile</p>' : "") +
@@ -191,6 +195,7 @@
   // cronologia: il tasto "indietro" del telefono chiude il pannello invece di uscire dal sito
   function render(state) {
     if (state && state.z) openDrawer(state.z); else closeDrawer();
+    if (!(state && state.sheet)) closeSheet();
   }
   function closeAll() {
     if (history.state && history.state.z) {
@@ -204,7 +209,11 @@
   $("#close").addEventListener("click", closeAll);
   backBtn.addEventListener("click", function () { history.back(); });
   window.addEventListener("popstate", function (e) { render(e.state); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && drawer.classList.contains("is-open")) closeAll(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (sheetOpen) closeSheetFromUser();
+    else if (drawer.classList.contains("is-open")) closeAll();
+  });
 
   $$("[data-go]", drawer).forEach(function (b) {
     b.addEventListener("click", function () {
@@ -283,6 +292,116 @@
     }
   };
 
-  // se la pagina viene ricaricata con il pannello aperto, riparti pulito
-  if (history.state && history.state.z) history.replaceState(null, "");
+  /* ---------- SCHEDA PRODOTTO ---------- */
+  // La foto si scarica solo quando si apre la scheda: il menu resta leggero.
+  var sheet = $("#sheet"), card = $("#sheetCard"), sheetImg = $("#sheetImg"), sheetPh = $("#sheetPh");
+  var sheetOpen = false, sheetToken = 0, sheetReturn = null;
+  var desktop = window.matchMedia("(min-width: 760px)");
+
+  // Segnaposto coordinato: tonalità scelta in base al nome, sempre uguale per lo stesso prodotto
+  var PH = ["ph-terracotta", "ph-palm", "ph-sand", "ph-wood"];
+  function phClass(name) {
+    var h = 0;
+    for (var k = 0; k < name.length; k++) h = (h * 31 + name.charCodeAt(k)) >>> 0;
+    return PH[h % PH.length];
+  }
+
+  function openSheet(ci, vi) {
+    var c = currentMenu[ci], v = c && c.voci[vi];
+    if (!v) return;
+    var token = ++sheetToken;
+    sheetReturn = document.activeElement;
+
+    $("#sheetCat").textContent = c.categoria;
+    $("#sheetName").innerHTML = esc(v.nome) + (v.tag ? '<span class="tag">' + esc(v.tag) + "</span>" : "");
+    $("#sheetDesc").textContent = v.desc || "";
+    $("#sheetDesc").hidden = !v.desc;
+    $("#sheetPrice").innerHTML = price(v.prezzo);
+    $("#sheetOff").hidden = v.disponibile !== false;
+    card.classList.toggle("is-off", v.disponibile === false);
+    $("#sheetPhName").textContent = v.nome;
+    sheetPh.className = "sheet-ph " + phClass(v.nome);
+
+    // Foto: parte nascosta sopra il segnaposto e compare in dissolvenza solo se si carica davvero
+    sheetImg.classList.remove("is-loaded");
+    sheetImg.parentNode.classList.remove("has-photo");
+    sheetImg.removeAttribute("src");
+    sheetImg.alt = v.nome;
+    getPhoto(v).then(function (src) {
+      if (!src || token !== sheetToken) return;
+      sheetImg.onload = function () {
+        if (token !== sheetToken) return;
+        sheetImg.classList.add("is-loaded");
+        sheetImg.parentNode.classList.add("has-photo");   // il segnaposto sfuma via: non traspare sotto la foto
+      };
+      sheetImg.onerror = function () { sheetImg.removeAttribute("src"); };
+      sheetImg.src = src;
+    });
+
+    card.style.transform = "";
+    card.scrollTop = 0;
+    sheet.hidden = false;
+    document.body.classList.add("lock");
+    sheetOpen = true;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { sheet.classList.add("is-open"); }); });
+    setTimeout(function () { var x = $(".sheet-close", sheet); if (x) x.focus({ preventScroll: true }); }, 50);
+  }
+
+  function getPhoto(v) {
+    if (v.id && window.ZanzibarPhotos) return window.ZanzibarPhotos.get(v.id).catch(function () { return v.foto || null; })
+      .then(function (src) { return src || v.foto || null; });
+    return Promise.resolve(v.foto || null);
+  }
+
+  function closeSheet() {
+    if (!sheetOpen) return;
+    sheetOpen = false;
+    sheetToken++;
+    sheet.classList.remove("is-open");
+    card.style.transform = "";
+    if (!drawer.classList.contains("is-open")) document.body.classList.remove("lock");
+    setTimeout(function () { if (!sheetOpen) { sheet.hidden = true; sheetImg.removeAttribute("src"); } }, 420);
+    if (sheetReturn && document.contains(sheetReturn)) sheetReturn.focus({ preventScroll: true });
+  }
+  // chiusura da X, sfondo, Esc o swipe: torna indietro nella cronologia (così il tasto "indietro" resta coerente)
+  function closeSheetFromUser() {
+    if (history.state && history.state.sheet) history.back(); else closeSheet();
+  }
+
+  menuEl.addEventListener("click", function (e) {
+    var it = e.target.closest(".item[data-c]");
+    if (!it) return;
+    history.pushState({ sheet: 1 }, "");
+    openSheet(+it.dataset.c, +it.dataset.v);
+  });
+  menuEl.addEventListener("keydown", function (e) {
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches(".item[data-c]")) { e.preventDefault(); e.target.click(); }
+  });
+  $$("[data-close-sheet]", sheet).forEach(function (el) { el.addEventListener("click", closeSheetFromUser); });
+
+  // Swipe verso il basso per chiudere (solo telefono, quando la scheda è in cima)
+  var startY = null, startT = 0, dy = 0;
+  card.addEventListener("touchstart", function (e) {
+    if (desktop.matches || card.scrollTop > 0 || e.touches.length > 1) { startY = null; return; }
+    startY = e.touches[0].clientY; startT = Date.now(); dy = 0;
+  }, { passive: true });
+  card.addEventListener("touchmove", function (e) {
+    if (startY === null) return;
+    dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { card.style.transform = ""; return; }
+    card.classList.add("is-dragging");
+    card.style.transform = "translateY(" + dy + "px)";
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  card.addEventListener("touchend", function () {
+    if (startY === null) return;
+    card.classList.remove("is-dragging");
+    var fast = dy > 40 && dy / Math.max(1, Date.now() - startT) > 0.5;
+    if (dy > 120 || fast) closeSheetFromUser();
+    else card.style.transform = "";
+    startY = null;
+  });
+
+  // se la pagina viene ricaricata con il pannello o la scheda aperti, riparti pulito
+  if (history.state && (history.state.z || history.state.sheet)) history.replaceState(null, "");
 })();

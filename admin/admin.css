@@ -162,6 +162,47 @@ code { font-size: .88em; background: var(--surface-2); padding: 1px 6px; border-
 .field__password input { padding-right: 4.5rem; }
 .field__password .link-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; }
 
+/* Foto del prodotto */
+.field__label {
+  display: block;
+  font-size: .66rem; letter-spacing: .2em; text-transform: uppercase; font-weight: 400;
+  color: var(--muted);
+  margin-bottom: .45rem;
+}
+.photo { display: grid; grid-template-columns: 116px 1fr; gap: 16px; align-items: center; }
+.photo__preview {
+  position: relative; aspect-ratio: 4 / 5; overflow: hidden;
+  border-radius: 10px; border: 1px dashed var(--soft); background: var(--surface-2);
+  display: grid; place-items: center;
+}
+.photo__preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; animation: photoIn .4s var(--ease) both; }
+.photo.has-photo .photo__preview { border-style: solid; border-color: var(--line); }
+@keyframes photoIn { from { opacity: 0; } to { opacity: 1; } }
+.photo__empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); text-align: center;
+}
+.photo__empty svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; }
+.photo__busy {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+}
+.photo__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.field label.photo__pick {
+  display: inline-flex; margin: 0; cursor: pointer;
+  font-size: .64rem; letter-spacing: .16em; color: var(--ink);
+}
+.photo__pick:focus-within { outline: 1.5px solid var(--accent); outline-offset: 3px; }
+.field .photo input[type="file"] {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); opacity: 0;
+}
+.photo__remove:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+.photo .field__hint.is-ok { color: var(--success); }
+.photo .field__hint.is-error { color: var(--danger); }
+.photo.is-busy .photo__actions { opacity: .5; pointer-events: none; }
+
 .form-msg { min-height: 1.4em; font-size: .86rem; margin: 0 0 1rem; color: var(--danger); }
 .form-msg.is-ok { color: var(--success); }
 

@@ -3,13 +3,14 @@
    Firebase Authentication (email e password) + Firestore
    Collezioni: "categories" { name, order }
                "items" { name, description, price, available, tag, categoryId, order }
+               "photos" { data } → foto JPEG compressa (data URL), stesso ID della voce
    ========================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, writeBatch, serverTimestamp
+  getFirestore, collection, doc, getDoc, onSnapshot, addDoc, updateDoc, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -58,6 +59,11 @@ function friendlyError(err) {
     "unavailable": "Database non raggiungibile. Controlla la connessione.",
     "not-found": "L'elemento non esiste più.",
     "invalid-argument": "Dati non validi: controlla i campi e riprova.",
+    "photo/not-image": "Il file scelto non è un'immagine.",
+    "photo/too-large-file": "La foto è troppo grande (oltre 40 MB): scegline un'altra.",
+    "photo/unreadable": "Impossibile leggere questa foto (formato non supportato da questo browser). Prova a scattarla di nuovo o a usare un JPEG.",
+    "photo/too-large": "La foto resta troppo pesante anche dopo la compressione: scegline un'altra.",
+    "photo/offline": "Connessione assente: la foto non può essere salvata. Controlla la rete e riprova.",
     "timeout": "Il database non ha confermato il salvataggio. Controlla la connessione e che le regole di Firestore pubblicate siano quelle del file firestore.rules."
   };
   return map[code] || "Si è verificato un errore" + (code ? ` (${code})` : "") + ".";
@@ -75,6 +81,53 @@ function reportError(where, err) {
   console.error(`[admin] ${where} non riuscito:`, (err && err.code) || "", (err && err.message) || "", err);
   showToast(friendlyError(err), true);
   return friendlyError(err);
+}
+
+/* ---------- Compressione foto (nel browser, prima del salvataggio) ---------- */
+// Lato lungo massimo 900px, JPEG, sotto i 150 KB. Il risultato è un data URL salvato in Firestore.
+const PHOTO_MAX_SIDE = 900;
+const PHOTO_MAX_BYTES = 150 * 1024;
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject({ code: "photo/unreadable" }); };
+    img.src = url;   // il browser applica da solo l'orientamento EXIF delle foto del telefono
+  });
+}
+const toBlob = (canvas, q) => new Promise((res) => canvas.toBlob(res, "image/jpeg", q));
+const blobToDataURL = (blob) => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result);
+  r.onerror = () => rej({ code: "photo/unreadable" });
+  r.readAsDataURL(blob);
+});
+
+async function compressPhoto(file) {
+  if (!file || !/^image\//.test(file.type || "image/")) throw { code: "photo/not-image" };
+  if (file.size > 40 * 1024 * 1024) throw { code: "photo/too-large-file" };
+  const img = await loadImage(file);
+  let scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  for (let round = 0; round < 6; round++) {
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    ctx.fillStyle = "#fff";   // le PNG trasparenti diventano su fondo bianco
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const q of [0.82, 0.74, 0.66, 0.58, 0.5]) {
+      const blob = await toBlob(canvas, q);
+      if (blob && blob.size <= PHOTO_MAX_BYTES) {
+        return { dataUrl: await blobToDataURL(blob), bytes: blob.size, width: canvas.width, height: canvas.height };
+      }
+    }
+    scale *= 0.85;   // ancora troppo pesante: riduce un po' le dimensioni e riprova
+  }
+  throw { code: "photo/too-large" };
 }
 
 /* ---------- Avvio ---------- */
@@ -457,6 +510,86 @@ function start() {
 
   itemForm.addEventListener("input", (e) => e.target.classList.remove("is-invalid"));
 
+  /* ---------- Foto del prodotto ---------- */
+  const photoBox = $("#photoBox");
+  const photoImg = $("#photoImg");
+  const photoInput = $("#fPhoto");
+  const photoHint = $("#photoHint");
+  const photoRemove = $("#photoRemove");
+  const PHOTO_HINT = photoHint.textContent;
+  // saved: foto già salvata (data URL o null) · next: undefined = invariata, stringa = nuova, null = da rimuovere
+  let photo = { saved: null, next: undefined, token: 0 };
+
+  function setPhotoHint(text, kind) {
+    photoHint.textContent = text;
+    photoHint.classList.toggle("is-ok", kind === "ok");
+    photoHint.classList.toggle("is-error", kind === "error");
+  }
+  function setPhotoBusy(on, label = "Preparazione…") {
+    photoBox.classList.toggle("is-busy", on);
+    $("#photoBusy").hidden = !on;
+    $("#photoBusy").textContent = label;
+  }
+  function showPhoto(src) {
+    const has = !!src;
+    photoBox.classList.toggle("has-photo", has);
+    photoImg.hidden = !has;
+    if (has) photoImg.src = src; else photoImg.removeAttribute("src");
+    $("#photoEmpty").hidden = has;
+    photoRemove.hidden = !has;
+    $("#photoPickLabel").textContent = has ? "Sostituisci" : "Scegli foto";
+  }
+
+  async function loadPhoto(item) {
+    const token = ++photo.token;
+    photo = { saved: null, next: undefined, token };
+    photoInput.value = "";
+    setPhotoHint(PHOTO_HINT);
+    showPhoto(null);
+    if (!item) return;
+    setPhotoBusy(true, "Caricamento…");
+    try {
+      const snap = await getDoc(doc(db, "photos", item.id));
+      if (token !== photo.token) return;
+      photo.saved = snap.exists() ? snap.data().data || null : null;
+      if (photo.next === undefined) showPhoto(photo.saved);
+    } catch (err) {
+      if (token !== photo.token) return;
+      console.error("[admin] Lettura foto non riuscita:", err);
+      setPhotoHint("Non riesco a leggere la foto salvata: " + friendlyError(err), "error");
+    } finally {
+      if (token === photo.token) setPhotoBusy(false);
+    }
+  }
+
+  photoInput.addEventListener("change", async () => {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    const token = photo.token;
+    setPhotoBusy(true);
+    setPhotoHint("Compressione della foto…");
+    try {
+      const out = await compressPhoto(file);
+      if (token !== photo.token) return;
+      photo.next = out.dataUrl;
+      showPhoto(out.dataUrl);
+      setPhotoHint(`Foto pronta: ${out.width}×${out.height} px, ${Math.round(out.bytes / 1024)} KB. Verrà salvata con "Salva".`, "ok");
+    } catch (err) {
+      if (token !== photo.token) return;
+      console.error("[admin] Foto non valida:", err);
+      setPhotoHint(friendlyError(err), "error");
+    } finally {
+      if (token === photo.token) setPhotoBusy(false);
+      photoInput.value = "";   // permette di riscegliere lo stesso file
+    }
+  });
+
+  photoRemove.addEventListener("click", () => {
+    photo.next = null;
+    showPhoto(null);
+    setPhotoHint(photo.saved ? 'La foto verrà rimossa quando premi "Salva".' : PHOTO_HINT, photo.saved ? "ok" : undefined);
+  });
+
   function openItemForm(item, categoryId) {
     if (!categories.length) {
       showToast("Crea prima una categoria", true);
@@ -481,6 +614,7 @@ function start() {
     F.description.value = v.description || "";
     F.tag.value = v.tag || "";
     F.available.checked = v.available !== false;
+    loadPhoto(item);
 
     openLayer(itemDrawer, F.name);
   }
@@ -537,17 +671,33 @@ function start() {
       itemFormMsg.textContent = "Inserisci " + errors.join(", ") + ".";
       return;
     }
+    if (photoBox.classList.contains("is-busy")) {
+      itemFormMsg.textContent = "Attendi che la foto sia pronta.";
+      return;
+    }
+    const photoChanged = photo.next !== undefined && photo.next !== photo.saved;
+    if (photoChanged && !navigator.onLine) {
+      itemFormMsg.textContent = reportError("Salvataggio foto", { code: "photo/offline" });
+      return;
+    }
     itemSaveBtn.disabled = true;
     const label = itemSaveBtn.textContent;
     itemSaveBtn.textContent = "Salvataggio…";
     try {
-      if (editingItem) {
-        await confirmed(updateDoc(doc(db, "items", editingItem.id), data));
-        showToast(`"${data.name}" aggiornato`);
-      } else {
-        await confirmed(addDoc(itemsCol, { ...data, createdAt: serverTimestamp() }));
-        showToast(`"${data.name}" aggiunto al menu`);
+      // Voce e foto vengono salvate insieme: o tutto o niente
+      const batch = writeBatch(db);
+      const ref = editingItem ? doc(db, "items", editingItem.id) : doc(itemsCol);
+      if (editingItem) batch.update(ref, data);
+      else batch.set(ref, { ...data, createdAt: serverTimestamp() });
+      if (photoChanged) {
+        const photoRef = doc(db, "photos", ref.id);
+        if (photo.next) batch.set(photoRef, { data: photo.next, updatedAt: serverTimestamp() });
+        else batch.delete(photoRef);
       }
+      await confirmed(batch.commit(), photoChanged ? 30000 : 15000);
+      if (photoChanged) photo.saved = photo.next;
+      const what = photoChanged ? (photo.next ? " con la nuova foto" : ", foto rimossa") : "";
+      showToast(editingItem ? `"${data.name}" aggiornato${what}` : `"${data.name}" aggiunto al menu${what}`);
       closeItemForm();
     } catch (err) {
       itemFormMsg.textContent = reportError("Salvataggio voce", err);
@@ -647,10 +797,14 @@ function start() {
       const batch = writeBatch(db);
       if (type === "category") {
         // La categoria viene eliminata insieme a tutte le sue voci
-        itemsOf(data.id).forEach((v) => batch.delete(doc(db, "items", v.id)));
+        itemsOf(data.id).forEach((v) => {
+          batch.delete(doc(db, "items", v.id));
+          batch.delete(doc(db, "photos", v.id));
+        });
         batch.delete(doc(db, "categories", data.id));
       } else {
         batch.delete(doc(db, "items", data.id));
+        batch.delete(doc(db, "photos", data.id));   // anche la sua foto, se c'è
       }
       await confirmed(batch.commit());
       showToast(`"${data.name}" eliminat${type === "category" ? "a" : "o"}`);

@@ -77,6 +77,34 @@
     </div>
   </aside>
 
+  <!-- SCHEDA PRODOTTO (si apre toccando una voce del menu) -->
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetName" hidden>
+    <div class="sheet-scrim" data-close-sheet></div>
+    <article class="sheet-card" id="sheetCard">
+      <span class="sheet-grip" aria-hidden="true"></span>
+      <button class="sheet-close" data-close-sheet aria-label="Chiudi">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <div class="sheet-media">
+        <div class="sheet-ph" id="sheetPh" aria-hidden="true">
+          <svg class="sheet-ph-leaf" viewBox="0 0 24 24"><path d="M12 22V11M12 11C10 6 6 4 2 5c3 1 6 3 10 6Zm0 0c2-5 6-7 10-6-3 1-6 3-10 6Zm0 0C9 8 5 9 3 12c3-1 6-1 9-1Zm0 0c3-3 7-2 9 1-3-1-6-1-9-1Z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="sheet-ph-name" id="sheetPhName"></span>
+          <span class="sheet-ph-brand">Zanzibar</span>
+        </div>
+        <img id="sheetImg" alt="" decoding="async">
+      </div>
+      <div class="sheet-body">
+        <span class="sheet-cat" id="sheetCat"></span>
+        <h2 class="sheet-name" id="sheetName"></h2>
+        <p class="sheet-desc" id="sheetDesc"></p>
+        <div class="sheet-foot">
+          <span class="sheet-price" id="sheetPrice"></span>
+          <span class="sheet-off" id="sheetOff" hidden>Non disponibile</span>
+        </div>
+      </div>
+    </article>
+  </div>
+
   <!-- VISUALIZZATORE FOTO -->
   <div class="lightbox" id="lightbox" hidden>
     <img alt="">

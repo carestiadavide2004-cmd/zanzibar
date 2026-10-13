@@ -3,7 +3,7 @@ rules_version = '2';
 // ==========================================================
 // Zanzibar — regole di sicurezza Firestore
 // ----------------------------------------------------------
-// - Chiunque può LEGGERE categorie e voci (servono al menu pubblico).
+// - Chiunque può LEGGERE categorie, voci e foto (servono al menu pubblico).
 // - Solo il proprietario può CREARE, MODIFICARE o ELIMINARE.
 // - I dati salvati devono avere il formato giusto (nome, prezzo…).
 //
@@ -52,6 +52,19 @@ service cloud.firestore {
     match /items/{itemId} {
       allow read: if true;
       allow create, update: if isOwner() && isValidItem();
+      allow delete: if isOwner();
+    }
+
+    // Foto dei prodotti: un documento per voce, con lo stesso ID della voce.
+    // "data" è la foto JPEG compressa dal pannello, scritta come testo (data URL base64).
+    // 273100 caratteri = circa 200 KB di immagine JPEG.
+    match /photos/{photoId} {
+      allow read: if true;
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(["data", "updatedAt"])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 273100
+        && request.resource.data.data.matches('data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}');
       allow delete: if isOwner();
     }
 
