@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// ==========================================================
+// Zanzibar — regole di sicurezza Firestore
+// ----------------------------------------------------------
+// - Chiunque può LEGGERE categorie e voci (servono al menu pubblico).
+// - Solo il proprietario può CREARE, MODIFICARE o ELIMINARE.
+// - I dati salvati devono avere il formato giusto (nome, prezzo…).
+//
+// Sostituisci INSERISCI_UID_PROPRIETARIO con l'UID dell'utente
+// creato in Firebase → Authentication → Utenti (colonna "UID utente").
+// ==========================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.uid == "yFhDfv68LtUNvTAFlHcinSRU1mB2";
+    }
+
+    function isNumber(v) {
+      return v is int || v is float;
+    }
+
+    function isValidCategory() {
+      let c = request.resource.data;
+      return c.keys().hasOnly(["name", "order", "createdAt", "updatedAt"])
+        && c.name is string && c.name.size() > 0 && c.name.size() <= 60
+        && isNumber(c.order);
+    }
+
+    function isValidItem() {
+      let v = request.resource.data;
+      return v.keys().hasOnly(["name", "description", "price", "available", "tag", "categoryId", "order", "createdAt", "updatedAt"])
+        && v.name is string && v.name.size() > 0 && v.name.size() <= 120
+        && v.description is string && v.description.size() <= 500
+        && isNumber(v.price) && v.price >= 0 && v.price <= 100000
+        && v.available is bool
+        && v.tag is string && v.tag.size() <= 30
+        && isNumber(v.order)
+        // la categoria deve esistere (anche se creata nella stessa operazione)
+        && v.categoryId is string
+        && existsAfter(/databases/$(database)/documents/categories/$(v.categoryId));
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isOwner() && isValidCategory();
+      allow delete: if isOwner();
+    }
+
+    match /items/{itemId} {
+      allow read: if true;
+      allow create, update: if isOwner() && isValidItem();
+      allow delete: if isOwner();
+    }
+
+    // Tutto il resto è chiuso
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

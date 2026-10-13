@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Area riservata — Zanzibar</title>
+  <script>
+    // "/admin" → "/admin/" così i percorsi relativi (css, js) funzionano sempre
+    if (/\/admin$/.test(location.pathname)) location.replace(location.pathname + "/" + location.search + location.hash);
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c0643f'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23f6efe6'%3EZ%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ============ CARICAMENTO ============ -->
+  <div class="view view--loading" id="viewLoading">
+    <p class="brand">Zanzibar</p>
+    <span class="spinner" aria-label="Caricamento"></span>
+  </div>
+
+  <!-- ============ FIREBASE NON CONFIGURATO ============ -->
+  <div class="view view--center" id="viewSetup" hidden>
+    <div class="panel-card">
+      <p class="brand">Zanzibar</p>
+      <p class="eyebrow">Configurazione richiesta</p>
+      <h1 class="title">Collega Firebase</h1>
+      <p class="muted">Il pannello non è ancora collegato al database. Apri il file <code>firebase-config.js</code> e incolla le chiavi del tuo progetto Firebase.</p>
+      <p class="muted">Trovi tutti i passaggi nel file <code>GUIDA-FIREBASE.md</code>, nella cartella del sito.</p>
+      <a href="../" class="btn btn--ghost">Torna al sito</a>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN ============ -->
+  <div class="view view--login" id="viewLogin" hidden>
+    <div class="login__visual" aria-hidden="true">
+      <div class="login__quote">
+        <p class="brand brand--light">Zanzibar</p>
+        <p>Bar &amp; Lounge — il tuo menu, sempre aggiornato.</p>
+      </div>
+    </div>
+    <div class="login__side">
+      <form class="login__form" id="loginForm" novalidate>
+        <p class="eyebrow">Area riservata</p>
+        <h1 class="title">Accedi al pannello</h1>
+        <p class="muted">Gestisci categorie, piatti e bevande del menu.</p>
+
+        <div class="field">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <div class="field__password">
+            <input type="password" id="loginPassword" autocomplete="current-password" required>
+            <button type="button" class="link-btn" id="togglePassword" aria-label="Mostra password">Mostra</button>
+          </div>
+        </div>
+
+        <p class="form-msg" id="loginMsg" role="alert"></p>
+
+        <button type="submit" class="btn btn--dark btn--block" id="loginSubmit">Accedi</button>
+        <div class="login__links">
+          <button type="button" class="link-btn" id="forgotPassword">Password dimenticata?</button>
+          <a href="../" class="link-btn">← Torna al sito</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="view view--app" id="viewApp" hidden>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <p class="brand brand--light">Zanzibar <span class="topbar__badge">Admin</span></p>
+        <div class="topbar__right">
+          <span class="topbar__user" id="userEmail"></span>
+          <a href="../" target="_blank" rel="noopener" class="topbar__link">Vedi menu</a>
+          <button class="topbar__link" id="logoutBtn">Esci</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash">
+      <div class="dash__head">
+        <div>
+          <p class="eyebrow">Gestione</p>
+          <h1 class="title">Il tuo <em>menu</em></h1>
+        </div>
+        <div class="dash__actions">
+          <button class="btn btn--ghost" id="newCategoryBtn">+ Categoria</button>
+          <button class="btn btn--accent" id="newItemBtn">+ Nuova voce</button>
+        </div>
+      </div>
+
+      <section class="stats" aria-label="Riepilogo">
+        <div class="stat"><span class="stat__label">Categorie</span><span class="stat__value" id="statCategories">–</span></div>
+        <div class="stat"><span class="stat__label">Voci</span><span class="stat__value" id="statItems">–</span></div>
+        <div class="stat"><span class="stat__label">Disponibili</span><span class="stat__value" id="statAvailable">–</span></div>
+        <div class="stat"><span class="stat__label">Non disponibili</span><span class="stat__value" id="statOut">–</span></div>
+      </section>
+
+      <div class="toolbar" id="toolbar">
+        <label class="sr-only" for="searchInput">Cerca</label>
+        <input type="search" id="searchInput" class="toolbar__search" placeholder="Cerca un piatto o una bevanda…">
+        <label class="sr-only" for="categoryFilter">Categoria</label>
+        <select id="categoryFilter" class="toolbar__select">
+          <option value="">Tutte le categorie</option>
+        </select>
+        <label class="sr-only" for="availabilityFilter">Disponibilità</label>
+        <select id="availabilityFilter" class="toolbar__select">
+          <option value="">Tutte</option>
+          <option value="yes">Disponibili</option>
+          <option value="no">Non disponibili</option>
+        </select>
+      </div>
+
+      <div id="menuGroups"></div>
+
+      <div class="empty" id="emptyState" hidden>
+        <p class="empty__title">Il menu nel database è vuoto</p>
+        <p class="muted">Crea la prima categoria oppure importa il menu già scritto nel sito (file <code>data.js</code>).</p>
+        <div class="empty__actions">
+          <button class="btn btn--dark" id="seedBtn">Importa menu attuale</button>
+          <button class="btn btn--ghost" id="emptyNewBtn">Nuova categoria</button>
+        </div>
+      </div>
+      <p class="no-results muted" id="noResults" hidden>Nessuna voce corrisponde alla ricerca.</p>
+    </main>
+  </div>
+
+  <!-- ============ FORM VOCE (piatto / bevanda) ============ -->
+  <div class="drawer" id="itemDrawer" role="dialog" aria-modal="true" aria-labelledby="itemFormTitle" hidden>
+    <div class="drawer__backdrop" data-close-item></div>
+    <aside class="drawer__panel">
+      <div class="drawer__head">
+        <div>
+          <p class="eyebrow" id="itemFormEyebrow">Nuova voce</p>
+          <h2 class="drawer__title" id="itemFormTitle">Aggiungi al menu</h2>
+        </div>
+        <button class="drawer__close" data-close-item aria-label="Chiudi">&times;</button>
+      </div>
+
+      <form class="drawer__body" id="itemForm" novalidate>
+        <div class="field">
+          <label for="fName">Nome *</label>
+          <input type="text" id="fName" name="name" maxlength="120" required placeholder="es. Spritz Aperol">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="fCategory">Categoria *</label>
+            <select id="fCategory" name="categoryId" required></select>
+          </div>
+          <div class="field">
+            <label for="fPrice">Prezzo (€) *</label>
+            <input type="number" id="fPrice" name="price" min="0" step="0.01" inputmode="decimal" required placeholder="0,00">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fDescription">Descrizione</label>
+          <textarea id="fDescription" name="description" rows="3" maxlength="500" placeholder="Ingredienti, formato, note…"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="fTag">Etichetta</label>
+          <input type="text" id="fTag" name="tag" maxlength="30" list="tagSuggestions" placeholder="es. Vegan, Signature">
+          <datalist id="tagSuggestions">
+            <option value="Veg"><option value="Vegan"><option value="Signature">
+            <option value="Analcolico"><option value="Novità"><option value="Senza glutine"><option value="Piccante">
+          </datalist>
+          <p class="field__hint">Facoltativa: compare come piccolo bollino accanto al nome.</p>
+        </div>
+
+        <div class="field field--switch">
+          <label class="switch">
+            <input type="checkbox" id="fAvailable" name="available" checked>
+            <span class="switch__track" aria-hidden="true"></span>
+            <span class="switch__label">Disponibile</span>
+          </label>
+          <p class="field__hint">Se disattivato, la voce resta nel menu con la scritta "Non disponibile".</p>
+        </div>
+
+        <p class="form-msg" id="itemFormMsg" role="alert"></p>
+      </form>
+
+      <div class="drawer__foot">
+        <button type="button" class="btn btn--ghost" data-close-item>Annulla</button>
+        <button type="submit" form="itemForm" class="btn btn--dark" id="itemSaveBtn">Salva</button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ FORM CATEGORIA ============ -->
+  <div class="modal" id="categoryDialog" role="dialog" aria-modal="true" aria-labelledby="categoryFormTitle" hidden>
+    <div class="modal__backdrop" data-close-category></div>
+    <form class="modal__box" id="categoryForm" novalidate>
+      <p class="eyebrow" id="categoryFormEyebrow">Nuova categoria</p>
+      <h2 class="modal__title" id="categoryFormTitle">Aggiungi categoria</h2>
+      <div class="field">
+        <label for="cName">Nome *</label>
+        <input type="text" id="cName" name="name" maxlength="60" required placeholder="es. Cocktail">
+      </div>
+      <p class="form-msg" id="categoryFormMsg" role="alert"></p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" data-close-category>Annulla</button>
+        <button type="submit" class="btn btn--dark" id="categorySaveBtn">Salva</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ CONFERMA ELIMINAZIONE ============ -->
+  <div class="modal" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText" hidden>
+    <div class="modal__backdrop" data-cancel></div>
+    <div class="modal__box">
+      <h2 class="modal__title" id="confirmTitle">Eliminare?</h2>
+      <p class="muted" id="confirmText"></p>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" data-cancel>Annulla</button>
+        <button class="btn btn--danger" id="confirmDelete">Elimina</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="../firebase-config.js"></script>
+  <script src="../data.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
