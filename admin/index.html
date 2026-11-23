@@ -2,17 +2,15 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2d4a3a">
   <meta name="robots" content="noindex, nofollow">
   <title>Area riservata — Zanzibar</title>
   <script>
     // "/admin" → "/admin/" così i percorsi relativi (css, js) funzionano sempre
     if (/\/admin$/.test(location.pathname)) location.replace(location.pathname + "/" + location.search + location.hash);
   </script>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c0643f'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23f6efe6'%3EZ%3C/text%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232d4a3a'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23faf6f2'%3EZ%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -40,14 +38,14 @@
     <div class="login__visual" aria-hidden="true">
       <div class="login__quote">
         <p class="brand brand--light">Zanzibar</p>
-        <p>Bar &amp; Lounge — il tuo menu, sempre aggiornato.</p>
+        <p>Il tuo menù, sempre aggiornato.</p>
       </div>
     </div>
     <div class="login__side">
       <form class="login__form" id="loginForm" novalidate>
         <p class="eyebrow">Area riservata</p>
         <h1 class="title">Accedi al pannello</h1>
-        <p class="muted">Gestisci categorie, piatti e bevande del menu.</p>
+        <p class="muted">Gestisci categorie, piatti e bevande del menù.</p>
 
         <div class="field">
           <label for="loginEmail">Email</label>
@@ -86,50 +84,46 @@
     </header>
 
     <main class="dash">
+      <!-- Compare solo se nel database c'è ancora il vecchio menu di esempio -->
+      <div class="notice" id="legacyNotice" hidden>
+        <p class="notice__title">Nel database c'è ancora il menù di esempio</p>
+        <p>Il sito pubblico, per ora, mostra il menù vero scritto nel sito. Quando sei pronto premi “Importa menù vero”: da lì in poi lo gestisci tutto da qui.</p>
+        <button class="btn btn--dark" type="button" data-import>Importa menù vero</button>
+      </div>
+
       <div class="dash__head">
         <div>
           <p class="eyebrow">Gestione</p>
-          <h1 class="title">Il tuo <em>menu</em></h1>
+          <h1 class="title">Il tuo <em>menù</em></h1>
         </div>
         <div class="dash__actions">
           <button class="btn btn--ghost" id="newCategoryBtn">+ Categoria</button>
-          <button class="btn btn--accent" id="newItemBtn">+ Nuova voce</button>
+          <button class="btn btn--dark" id="newItemBtn">+ Voce</button>
         </div>
       </div>
 
-      <section class="stats" aria-label="Riepilogo">
-        <div class="stat"><span class="stat__label">Categorie</span><span class="stat__value" id="statCategories">–</span></div>
-        <div class="stat"><span class="stat__label">Voci</span><span class="stat__value" id="statItems">–</span></div>
-        <div class="stat"><span class="stat__label">Disponibili</span><span class="stat__value" id="statAvailable">–</span></div>
-        <div class="stat"><span class="stat__label">Non disponibili</span><span class="stat__value" id="statOut">–</span></div>
-      </section>
-
       <div class="toolbar" id="toolbar">
         <label class="sr-only" for="searchInput">Cerca</label>
-        <input type="search" id="searchInput" class="toolbar__search" placeholder="Cerca un piatto o una bevanda…">
-        <label class="sr-only" for="categoryFilter">Categoria</label>
-        <select id="categoryFilter" class="toolbar__select">
-          <option value="">Tutte le categorie</option>
-        </select>
-        <label class="sr-only" for="availabilityFilter">Disponibilità</label>
-        <select id="availabilityFilter" class="toolbar__select">
-          <option value="">Tutte</option>
-          <option value="yes">Disponibili</option>
-          <option value="no">Non disponibili</option>
-        </select>
+        <input type="search" id="searchInput" class="toolbar__search" placeholder="Cerca un piatto o una bevanda…" autocomplete="off">
       </div>
 
       <div id="menuGroups"></div>
 
       <div class="empty" id="emptyState" hidden>
-        <p class="empty__title">Il menu nel database è vuoto</p>
-        <p class="muted">Crea la prima categoria oppure importa il menu già scritto nel sito (file <code>data.js</code>).</p>
+        <p class="empty__title">Il menù nel database è vuoto</p>
+        <p class="muted">Importa il menù vero di Zanzibar oppure crea la prima categoria.</p>
         <div class="empty__actions">
-          <button class="btn btn--dark" id="seedBtn">Importa menu attuale</button>
+          <button class="btn btn--dark" type="button" data-import>Importa menù vero</button>
           <button class="btn btn--ghost" id="emptyNewBtn">Nuova categoria</button>
         </div>
       </div>
       <p class="no-results muted" id="noResults" hidden>Nessuna voce corrisponde alla ricerca.</p>
+
+      <details class="tools">
+        <summary>Strumenti</summary>
+        <p class="muted">“Importa menù vero” sostituisce <strong>tutte</strong> le categorie, le voci e le foto del database con il menù vero di Zanzibar (scritto nel file <code>data.js</code>). Prima scarica sul dispositivo una copia di sicurezza di quello che c'è adesso.</p>
+        <button class="btn btn--ghost" type="button" data-import>Importa menù vero</button>
+      </details>
     </main>
   </div>
 
@@ -148,27 +142,44 @@
       <form class="drawer__body" id="itemForm" novalidate>
         <div class="field">
           <label for="fName">Nome *</label>
-          <input type="text" id="fName" name="name" maxlength="120" required placeholder="es. Spritz Aperol">
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label for="fCategory">Categoria *</label>
-            <select id="fCategory" name="categoryId" required></select>
-          </div>
-          <div class="field">
-            <label for="fPrice">Prezzo (€) *</label>
-            <input type="number" id="fPrice" name="price" min="0" step="0.01" inputmode="decimal" required placeholder="0,00">
-          </div>
+          <input type="text" id="fName" name="name" maxlength="120" required placeholder="es. Classic Burger" autocomplete="off">
         </div>
 
         <div class="field">
-          <label for="fDescription">Descrizione</label>
-          <textarea id="fDescription" name="description" rows="3" maxlength="500" placeholder="Ingredienti, formato, note…"></textarea>
+          <label for="fCategory">Categoria *</label>
+          <select id="fCategory" name="categoryId" required></select>
         </div>
 
         <div class="field">
-          <span class="field__label" id="photoLabel">Foto del prodotto</span>
+          <label for="fDescription">Descrizione <span class="opt">facoltativa</span></label>
+          <textarea id="fDescription" name="description" rows="3" maxlength="500" placeholder="es. hamburger 100 g o 200 g di Black Angus, insalata, pomodoro"></textarea>
+        </div>
+
+        <fieldset class="field prices">
+          <legend>Prezzo <span class="opt">facoltativo</span></legend>
+          <div class="price-row">
+            <input type="text" name="label1" maxlength="20" placeholder="Etichetta (es. 100 g)" aria-label="Etichetta del primo prezzo" autocomplete="off">
+            <div class="euro"><span aria-hidden="true">€</span><input type="text" name="value1" inputmode="decimal" placeholder="0,00" aria-label="Primo prezzo in euro" autocomplete="off"></div>
+          </div>
+          <div class="price-row" id="price2Row">
+            <input type="text" name="label2" maxlength="20" placeholder="Etichetta (es. 200 g)" aria-label="Etichetta del secondo prezzo" autocomplete="off">
+            <div class="euro"><span aria-hidden="true">€</span><input type="text" name="value2" inputmode="decimal" placeholder="0,00" aria-label="Secondo prezzo in euro" autocomplete="off"></div>
+          </div>
+          <p class="field__hint">Un prezzo o due (es. 100 g e 200 g). Sul menù si vede “€ 6,50 / 9,00”; le etichette compaiono nella scheda con la foto. Lascia vuoto per non mostrare il prezzo.</p>
+        </fieldset>
+
+        <div class="field">
+          <label for="fSymbol">Simbolo <span class="opt">facoltativo</span></label>
+          <div class="symbol-row">
+            <input type="text" id="fSymbol" name="symbol" maxlength="4" placeholder="es. ★" autocomplete="off">
+            <button type="button" class="chip-btn" data-symbol="★">★</button>
+            <button type="button" class="chip-btn" data-symbol="">Nessuno</button>
+          </div>
+          <p class="field__hint">Compare accanto al nome, come la ★ dello Spicy Burger.</p>
+        </div>
+
+        <div class="field">
+          <span class="field__label" id="photoLabel">Foto <span class="opt">facoltativa</span></span>
           <div class="photo" id="photoBox" aria-labelledby="photoLabel">
             <div class="photo__preview">
               <img id="photoImg" alt="Anteprima della foto del prodotto" hidden>
@@ -186,28 +197,18 @@
                 </label>
                 <button type="button" class="btn btn--small photo__remove" id="photoRemove" hidden>Rimuovi</button>
               </div>
-              <p class="field__hint" id="photoHint">Dal telefono puoi anche scattarla al momento. Viene ridotta e compressa automaticamente prima del salvataggio.</p>
+              <p class="field__hint" id="photoHint">Puoi anche scattarla dal telefono. Se la voce ha una foto, sul menù si può toccare per vederla.</p>
             </div>
           </div>
         </div>
 
-        <div class="field">
-          <label for="fTag">Etichetta</label>
-          <input type="text" id="fTag" name="tag" maxlength="30" list="tagSuggestions" placeholder="es. Vegan, Signature">
-          <datalist id="tagSuggestions">
-            <option value="Veg"><option value="Vegan"><option value="Signature">
-            <option value="Analcolico"><option value="Novità"><option value="Senza glutine"><option value="Piccante">
-          </datalist>
-          <p class="field__hint">Facoltativa: compare come piccolo bollino accanto al nome.</p>
-        </div>
-
         <div class="field field--switch">
           <label class="switch">
-            <input type="checkbox" id="fAvailable" name="available" checked>
+            <input type="checkbox" id="fVisible" name="visible" checked>
             <span class="switch__track" aria-hidden="true"></span>
-            <span class="switch__label">Disponibile</span>
+            <span class="switch__label">Visibile sul menù</span>
           </label>
-          <p class="field__hint">Se disattivato, la voce resta nel menu con la scritta "Non disponibile".</p>
+          <p class="field__hint">Se la spegni, la voce resta qui nel pannello ma i clienti non la vedono.</p>
         </div>
 
         <p class="form-msg" id="itemFormMsg" role="alert"></p>
@@ -228,7 +229,26 @@
       <h2 class="modal__title" id="categoryFormTitle">Aggiungi categoria</h2>
       <div class="field">
         <label for="cName">Nome *</label>
-        <input type="text" id="cName" name="name" maxlength="60" required placeholder="es. Cocktail">
+        <input type="text" id="cName" name="name" maxlength="60" required placeholder="es. Fritteria" autocomplete="off">
+      </div>
+      <fieldset class="field">
+        <legend>Sezione del menù *</legend>
+        <div class="segmented">
+          <label><input type="radio" name="section" value="food" checked><span>Menù Food</span></label>
+          <label><input type="radio" name="section" value="drink"><span>Drink</span></label>
+        </div>
+      </fieldset>
+      <div class="field">
+        <label for="cNote">Nota in fondo <span class="opt">facoltativa</span></label>
+        <input type="text" id="cNote" name="note" maxlength="200" placeholder="es. Supplementi € 0,50" autocomplete="off">
+      </div>
+      <div class="field field--switch">
+        <label class="switch">
+          <input type="checkbox" id="cVisible" name="visible" checked>
+          <span class="switch__track" aria-hidden="true"></span>
+          <span class="switch__label">Visibile sul menù</span>
+        </label>
+        <p class="field__hint">Una categoria senza voci visibili non compare comunque sul menù.</p>
       </div>
       <p class="form-msg" id="categoryFormMsg" role="alert"></p>
       <div class="modal__actions">
@@ -246,7 +266,7 @@
       <p class="muted" id="confirmText"></p>
       <div class="modal__actions">
         <button class="btn btn--ghost" data-cancel>Annulla</button>
-        <button class="btn btn--danger" id="confirmDelete">Elimina</button>
+        <button class="btn btn--danger" id="confirmOk">Elimina</button>
       </div>
     </div>
   </div>

@@ -1,8 +1,8 @@
 /* ==========================================================
    Zanzibar — pannello di amministrazione del menu
    Firebase Authentication (email e password) + Firestore
-   Collezioni: "categories" { name, order }
-               "items" { name, description, price, available, tag, categoryId, order }
+   Collezioni: "categories" { name, order, section ("food" | "drink"), note, visible }
+               "items" { name, description, prices [{ label, value }] (0-2), symbol, visible, hasPhoto, categoryId, order }
                "photos" { data } → foto JPEG compressa (data URL), stesso ID della voce
    ========================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
@@ -10,7 +10,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {
-  getFirestore, collection, doc, getDoc, onSnapshot, addDoc, updateDoc, writeBatch, serverTimestamp
+  getFirestore, collection, doc, getDoc, getDocs, onSnapshot, addDoc, setDoc, updateDoc, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -19,11 +19,8 @@ const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 const ADMIN_EMAILS = (window.ZANZIBAR_ADMIN_EMAILS || []).map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const euro = (n) => "€ " + (Number(n) || 0).toFixed(2).replace(".", ",");
-const pad = (n) => (n < 10 ? "0" : "") + n;
 const byOrder = (a, b) => ((Number(a.order) || 0) - (Number(b.order) || 0)) || String(a.name).localeCompare(String(b.name), "it");
 const nextOrder = (list) => list.reduce((m, x) => Math.max(m, Number(x.order) || 0), 0) + 1;
-const slugId = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "categoria";
 
 /* ---------- Viste ---------- */
 const views = { loading: $("#viewLoading"), setup: $("#viewSetup"), login: $("#viewLogin"), app: $("#viewApp") };
@@ -55,7 +52,8 @@ function friendlyError(err) {
     "auth/network-request-failed": "Connessione assente. Controlla la rete e riprova.",
     "auth/unauthorized-domain": "Dominio non autorizzato: aggiungilo in Firebase → Authentication → Impostazioni → Domini autorizzati.",
     "auth/operation-not-allowed": "L'accesso con email e password non è attivo in Firebase Authentication.",
-    "permission-denied": "Permesso negato. Controlla che le regole di Firestore contengano il tuo UID.",
+    "permission-denied": "Permesso negato: controlla che in Firebase siano pubblicate le regole aggiornate (file firestore.rules).",
+    "too-many": "Troppe modifiche in una volta sola (oltre 500): contatta chi ha fatto il sito.",
     "unavailable": "Database non raggiungibile. Controlla la connessione.",
     "not-found": "L'elemento non esiste più.",
     "invalid-argument": "Dati non validi: controlla i campi e riprova.",
@@ -234,7 +232,11 @@ function start() {
 
   $("#logoutBtn").addEventListener("click", () => signOut(auth));
 
+
   /* ---------- Menu in tempo reale ---------- */
+  const SECTIONS = (window.ZANZIBAR && window.ZANZIBAR.sezioni) || { food: "Menù Food", drink: "Drink" };
+  const SECTION_KEYS = Object.keys(SECTIONS);
+
   function listenMenu() {
     loaded = { categories: false, items: false };
     const onError = (err) => {
@@ -255,166 +257,173 @@ function start() {
 
   const itemsOf = (catId) => items.filter((v) => v.categoryId === catId);
   const categoryById = (id) => categories.find((c) => c.id === id);
+  const catsOf = (section) => categories.filter((c) => c.section === section);
+  const sameSection = (c) => categories.filter((x) => x.section === c.section);
+  // Il vecchio menu di esempio non ha il campo "section" nelle categorie
+  const isLegacy = () => categories.length > 0 && !categories.some((c) => typeof c.section === "string");
+
+  // Prezzi di una voce (accetta anche il vecchio formato con un solo "price")
+  const pricesOf = (v) => Array.isArray(v.prices) ? v.prices : (typeof v.price === "number" ? [{ label: "", value: v.price }] : []);
+  const isVisible = (x) => (x.visible !== undefined ? x.visible !== false : x.available !== false);
+  const money = (n) => Number(n).toFixed(2).replace(".", ",");
+  const priceText = (list) => (list.length ? "€ " + list.map((p) => money(p.value)).join(" / ") : "");
 
   function render() {
     if (!loaded.categories || !loaded.items) return;
-    renderStats();
+    $("#legacyNotice").hidden = !isLegacy();
     renderCategoryOptions();
     renderGroups();
   }
 
-  function renderStats() {
-    const available = items.filter((v) => v.available !== false).length;
-    $("#statCategories").textContent = categories.length;
-    $("#statItems").textContent = items.length;
-    $("#statAvailable").textContent = available;
-    $("#statOut").textContent = items.length - available;
-  }
-
-  // Aggiorna le tendine delle categorie mantenendo la scelta corrente
+  // Tendina delle categorie nel form voce, divisa per sezione
   function renderCategoryOptions() {
-    const options = categories.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
-    const filterValue = categoryFilter.value;
-    categoryFilter.innerHTML = '<option value="">Tutte le categorie</option>' + options;
-    categoryFilter.value = categoryById(filterValue) ? filterValue : "";
+    const opt = (c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`;
+    const others = categories.filter((c) => !SECTIONS[c.section]);
     const formValue = F.categoryId.value;
-    F.categoryId.innerHTML = options;
+    F.categoryId.innerHTML = SECTION_KEYS.map((k) => {
+      const list = catsOf(k);
+      return list.length ? `<optgroup label="${esc(SECTIONS[k])}">${list.map(opt).join("")}</optgroup>` : "";
+    }).join("") + (others.length ? `<optgroup label="Senza sezione">${others.map(opt).join("")}</optgroup>` : "");
     if (categoryById(formValue)) F.categoryId.value = formValue;
   }
 
   const searchInput = $("#searchInput");
-  const categoryFilter = $("#categoryFilter");
-  const availabilityFilter = $("#availabilityFilter");
-  [searchInput, categoryFilter, availabilityFilter].forEach((el) => el.addEventListener("input", renderGroups));
+  searchInput.addEventListener("input", renderGroups);
 
   const icons = {
-    edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>',
     trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/></svg>',
     up: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>',
     down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
-    plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+    eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.6A10 10 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.3 2 12 2 12s3.6 6.5 10 6.5c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>'
   };
-  const iconBtn = (action, icon, label, opts = "") =>
-    `<button class="icon-btn${action === "delete" ? " icon-btn--danger" : ""}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label.split(" ")[0])}" ${opts}>${icons[icon]}</button>`;
+  const iconBtn = (action, icon, label, disabled = false) =>
+    `<button class="icon-btn${action.endsWith("delete") ? " icon-btn--danger" : ""}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}"${disabled ? " disabled" : ""}>${icons[icon]}</button>`;
+
+  function rowHtml(v, pos, total, inCategory) {
+    const vis = isVisible(v);
+    const ps = pricesOf(v);
+    const labels = ps.map((p) => p.label).filter(Boolean);
+    return `
+      <div class="row${vis ? "" : " is-hidden"}" data-id="${esc(v.id)}">
+        <button class="row__main" data-action="item-edit" aria-label="Modifica ${esc(v.name)}">
+          <span class="row__name">${esc(v.name)}${v.symbol ? ` <span class="row__sym">${esc(v.symbol)}</span>` : ""}</span>
+          ${v.description ? `<span class="row__desc">${esc(v.description)}</span>` : ""}
+          <span class="row__meta">
+            <span class="row__price${ps.length ? "" : " is-empty"}">${ps.length ? esc(priceText(ps)) : "Senza prezzo"}</span>
+            ${labels.length ? `<span class="row__labels">${esc(labels.join(" / "))}</span>` : ""}
+            ${v.hasPhoto ? '<span class="badge badge--soft">Foto</span>' : ""}
+            ${vis ? "" : '<span class="badge">Nascosta</span>'}
+          </span>
+        </button>
+        <div class="row__actions">
+          ${inCategory ? iconBtn("item-up", "up", `Sposta su ${v.name}`, pos === 0) : ""}
+          ${inCategory ? iconBtn("item-down", "down", `Sposta giù ${v.name}`, pos === total - 1) : ""}
+          ${iconBtn("item-visible", vis ? "eye" : "eyeOff", vis ? `Nascondi ${v.name}` : `Mostra ${v.name}`)}
+          ${iconBtn("item-delete", "trash", `Elimina ${v.name}`)}
+        </div>
+      </div>`;
+  }
+
+  function groupHtml(c, index, count, all, list) {
+    const hidden = c.visible === false;
+    const shownOnSite = !hidden && all.some(isVisible);
+    const badges =
+      (hidden ? '<span class="badge">Nascosta</span>' : "") +
+      (!hidden && !shownOnSite ? '<span class="badge badge--soft">Vuota: non compare sul menù</span>' : "");
+    return `
+      <section class="group${hidden ? " is-hidden" : ""}" data-cat="${esc(c.id)}">
+        <header class="group__head">
+          <button class="group__name" data-action="cat-edit" aria-label="Modifica la categoria ${esc(c.name)}">
+            <span class="group__title">${esc(c.name)}</span>
+            <span class="group__meta">${all.length} ${all.length === 1 ? "voce" : "voci"} ${badges}</span>
+            ${c.note ? `<span class="group__note">Nota: ${esc(c.note)}</span>` : ""}
+          </button>
+          <div class="group__actions">
+            ${iconBtn("cat-up", "up", `Sposta su ${c.name}`, index === 0)}
+            ${iconBtn("cat-down", "down", `Sposta giù ${c.name}`, index === count - 1)}
+            ${iconBtn("cat-visible", hidden ? "eyeOff" : "eye", hidden ? `Mostra ${c.name}` : `Nascondi ${c.name}`)}
+            ${iconBtn("cat-delete", "trash", `Elimina ${c.name}`)}
+          </div>
+        </header>
+        <div class="group__rows">${list.map((v) => rowHtml(v, all.indexOf(v), all.length, true)).join("") ||
+          '<p class="group__empty">Nessuna voce in questa categoria.</p>'}</div>
+        <button class="group__add" data-action="cat-add">+ Aggiungi una voce in ${esc(c.name)}</button>
+      </section>`;
+  }
 
   function renderGroups() {
     const q = searchInput.value.trim().toLowerCase();
-    const cat = categoryFilter.value;
-    const av = availabilityFilter.value;
-    const filtering = !!(q || av);
-    const matches = (v) =>
-      (!q || [v.name, v.description, v.tag].some((s) => String(s || "").toLowerCase().includes(q))) &&
-      (!av || (av === "yes") === (v.available !== false));
-
-    // Voci rimaste senza categoria (non visibili sul sito): mostrate in fondo per poterle sistemare
-    const orphans = items.filter((v) => !categoryById(v.categoryId));
-    const groups = categories.map((c, i) => ({ cat: c, index: i, list: itemsOf(c.id) }));
-    if (orphans.length) groups.push({ cat: null, index: groups.length, list: orphans });
+    const matches = (v) => !q || [v.name, v.description].some((s) => String(s || "").toLowerCase().includes(q));
 
     const isEmpty = categories.length === 0 && items.length === 0;
     $("#emptyState").hidden = !isEmpty;
     $("#toolbar").hidden = isEmpty;
 
-    let shown = 0;
-    $("#menuGroups").innerHTML = groups
-      .filter((g) => !cat || (g.cat && g.cat.id === cat))
-      .map((g) => {
-        const list = g.list.filter(matches);
-        if (filtering && !list.length) return "";
-        shown += list.length;
-        const c = g.cat;
-        const head = c ? `
-          <header class="group__head">
-            <div class="group__info">
-              <span class="group__num">${pad(g.index + 1)}</span>
-              <h2 class="group__title">${esc(c.name)}</h2>
-              <span class="group__count">${g.list.length} ${g.list.length === 1 ? "voce" : "voci"}</span>
-            </div>
-            <div class="group__actions">
-              ${iconBtn("cat-up", "up", `Sposta su ${c.name}`, g.index === 0 ? "disabled" : "")}
-              ${iconBtn("cat-down", "down", `Sposta giù ${c.name}`, g.index === categories.length - 1 ? "disabled" : "")}
-              ${iconBtn("cat-edit", "edit", `Rinomina ${c.name}`)}
-              ${iconBtn("cat-delete", "trash", `Elimina ${c.name}`)}
-              <button class="btn btn--small" data-action="cat-add">${icons.plus}<span>Voce</span></button>
-            </div>
-          </header>` : `
-          <header class="group__head group__head--warn">
-            <div class="group__info">
-              <h2 class="group__title">Senza categoria</h2>
-              <span class="group__count">Non visibili sul sito: modificale e scegli una categoria</span>
-            </div>
-          </header>`;
-        const rows = list.map((v, i) => {
-          const available = v.available !== false;
-          const pos = g.list.indexOf(v);
-          return `
-          <div class="row${available ? "" : " is-out"}" data-id="${esc(v.id)}" style="animation-delay:${Math.min(i, 12) * 25}ms">
-            <div class="row__main">
-              <p class="row__name">${esc(v.name)}${v.tag ? `<span class="chip">${esc(v.tag)}</span>` : ""}</p>
-              ${v.description ? `<p class="row__desc">${esc(v.description)}</p>` : ""}
-            </div>
-            <span class="row__price">${euro(v.price)}</span>
-            <span class="row__avail">
-              <label class="switch">
-                <input type="checkbox" data-toggle ${available ? "checked" : ""} aria-label="Disponibilità di ${esc(v.name)}">
-                <span class="switch__track" aria-hidden="true"></span>
-                <span class="row__avail-label">${available ? "Disponibile" : "Non disp."}</span>
-              </label>
-            </span>
-            <span class="row__actions">
-              ${c ? iconBtn("item-up", "up", `Sposta su ${v.name}`, pos === 0 ? "disabled" : "") : ""}
-              ${c ? iconBtn("item-down", "down", `Sposta giù ${v.name}`, pos === g.list.length - 1 ? "disabled" : "") : ""}
-              ${iconBtn("item-edit", "edit", `Modifica ${v.name}`)}
-              ${iconBtn("delete", "trash", `Elimina ${v.name}`)}
-            </span>
-          </div>`;
-        }).join("");
-        return `
-        <section class="group" data-cat="${c ? esc(c.id) : ""}">
-          ${head}
-          <div class="group__rows">${rows || (filtering ? "" : '<p class="group__empty">Nessuna voce: aggiungi il primo piatto o bevanda.</p>')}</div>
-        </section>`;
-      }).join("");
+    const blocks = SECTION_KEYS.map((k) => ({ title: SECTIONS[k], cats: catsOf(k) }));
+    const others = categories.filter((c) => !SECTIONS[c.section]);
+    if (others.length) blocks.push({ title: "Senza sezione", warn: true, cats: others });
 
-    $("#noResults").hidden = isEmpty || !filtering || shown > 0;
+    let shown = 0;
+    let html = isEmpty ? "" : blocks.map((b) => {
+      const groups = b.cats.map((c, i) => {
+        const all = itemsOf(c.id);
+        const list = all.filter(matches);
+        if (q && !list.length) return "";
+        shown += list.length;
+        return groupHtml(c, i, b.cats.length, all, list);
+      }).join("");
+      if (q && !groups) return "";
+      return `<section class="block">
+        <h2 class="block__title">${esc(b.title)}${b.warn ? ' <span class="badge badge--warn">da sistemare</span>' : ""}</h2>
+        ${groups || '<p class="block__empty">Nessuna categoria in questa sezione: creala con “+ Categoria”.</p>'}
+      </section>`;
+    }).join("");
+
+    // Voci rimaste senza categoria (non visibili sul sito): mostrate in fondo per poterle sistemare
+    const orphans = items.filter((v) => !categoryById(v.categoryId)).filter(matches);
+    if (orphans.length) {
+      shown += orphans.length;
+      html += `<section class="block"><h2 class="block__title">Voci senza categoria <span class="badge badge--warn">non visibili</span></h2>
+        <section class="group" data-cat=""><div class="group__rows">${orphans.map((v) => rowHtml(v, 0, 1, false)).join("")}</div></section></section>`;
+    }
+
+    $("#menuGroups").innerHTML = html;
+    $("#noResults").hidden = isEmpty || !q || shown > 0;
   }
 
   $("#menuGroups").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
     if (!btn || btn.disabled) return;
     const group = btn.closest(".group");
-    const category = categoryById(group.dataset.cat);
+    const category = group ? categoryById(group.dataset.cat) : null;
     const row = btn.closest(".row");
     const item = row ? items.find((v) => v.id === row.dataset.id) : null;
     switch (btn.dataset.action) {
-      case "cat-up": return moveCategory(category, -1);
-      case "cat-down": return moveCategory(category, 1);
-      case "cat-edit": return openCategoryForm(category);
-      case "cat-delete": return askDelete({ type: "category", data: category });
-      case "cat-add": return openItemForm(null, category.id);
-      case "item-up": return item && moveItem(item, -1);
-      case "item-down": return item && moveItem(item, 1);
+      case "cat-up": return category && reorder("categories", sameSection(category), category, -1);
+      case "cat-down": return category && reorder("categories", sameSection(category), category, 1);
+      case "cat-visible": return category && toggleVisible("categories", category);
+      case "cat-edit": return category && openCategoryForm(category);
+      case "cat-delete": return category && askDeleteCategory(category);
+      case "cat-add": return category && openItemForm(null, category.id);
+      case "item-up": return item && reorder("items", itemsOf(item.categoryId), item, -1);
+      case "item-down": return item && reorder("items", itemsOf(item.categoryId), item, 1);
+      case "item-visible": return item && toggleVisible("items", item);
       case "item-edit": return item && openItemForm(item);
-      case "delete": return item && askDelete({ type: "item", data: item });
+      case "item-delete": return item && askDeleteItem(item);
     }
   });
 
-  // Cambio rapido di disponibilità direttamente dall'elenco
-  $("#menuGroups").addEventListener("change", async (e) => {
-    if (!e.target.matches("[data-toggle]")) return;
-    const row = e.target.closest(".row");
-    const available = e.target.checked;
-    row.classList.add("is-busy");
+  /* ---------- Visibile / nascosta ---------- */
+  async function toggleVisible(colName, x) {
+    const visible = !isVisible(x);
     try {
-      await confirmed(updateDoc(doc(db, "items", row.dataset.id), { available, updatedAt: serverTimestamp() }));
-      showToast(available ? "Voce di nuovo disponibile" : "Voce segnata come non disponibile");
+      await confirmed(updateDoc(doc(db, colName, x.id), { visible, updatedAt: serverTimestamp() }));
+      showToast(`"${x.name}" ${visible ? "di nuovo visibile sul menù" : "nascost" + (colName === "categories" ? "a" : "o") + " dal menù"}`);
     } catch (err) {
-      e.target.checked = !available;
-      reportError("Cambio disponibilità", err);
-    } finally {
-      row.classList.remove("is-busy");
+      reportError("Cambio visibilità", err);
     }
-  });
+  }
 
   /* ---------- Ordinamento (frecce su / giù) ---------- */
   // Scambia l'elemento con il vicino e riscrive le posizioni 1, 2, 3… solo dove cambiano
@@ -439,50 +448,92 @@ function start() {
       reportError("Riordino", err);
     }
   }
-  const moveCategory = (c, dir) => reorder("categories", categories, c, dir);
-  const moveItem = (v, dir) => reorder("items", itemsOf(v.categoryId), v, dir);
 
-  /* ---------- Importazione del menu di data.js ---------- */
-  async function seedMenu(btn) {
-    const menu = (window.ZANZIBAR && window.ZANZIBAR.menu) || [];
-    btn.disabled = true;
-    btn.textContent = "Importazione…";
-    try {
-      const batch = writeBatch(db);
-      let count = 0;
-      const used = {};
-      menu.forEach((c, ci) => {
-        let catId = slugId(c.categoria);
-        while (used[catId]) catId += "-" + (ci + 1);
-        used[catId] = true;
-        batch.set(doc(db, "categories", catId), {
-          name: String(c.categoria), order: ci + 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
-        (c.voci || []).forEach((v, vi) => {
-          batch.set(doc(db, "items", `${catId}-${vi + 1}`), {
-            name: String(v.nome),
-            description: String(v.desc || ""),
-            price: Math.round((Number(v.prezzo) || 0) * 100) / 100,
-            available: true,
-            tag: String(v.tag || ""),
-            categoryId: catId,
-            order: vi + 1,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-          count++;
-        });
-      });
-      await confirmed(batch.commit());
-      showToast(`Importate ${menu.length} categorie e ${count} voci`);
-    } catch (err) {
-      reportError("Importazione", err);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Importa menu attuale";
-    }
+  /* ---------- Importazione del menù vero (da data.js) ---------- */
+  function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
-  $("#seedBtn").addEventListener("click", (e) => seedMenu(e.currentTarget));
+
+  function askImport() {
+    const menu = window.ZANZIBAR && window.ZANZIBAR.menu;
+    if (!Array.isArray(menu) || !menu.length) {
+      showToast("Non trovo il menù vero nel file data.js.", true);
+      return;
+    }
+    const nItems = menu.reduce((n, c) => n + (c.voci || []).length, 0);
+    askConfirm({
+      title: "Importare il menù vero?",
+      text: `Tutto quello che c'è ora nel pannello (${categories.length} categorie, ${items.length} voci e le loro foto) verrà sostituito con il menù vero: ${menu.length} categorie e ${nItems} voci. ` +
+        "Prima viene scaricata sul dispositivo una copia di sicurezza di quello che c'è adesso. L'operazione non si può annullare dal pannello.",
+      ok: "Sì, sostituisci tutto",
+      run: () => importRealMenu(menu)
+    });
+  }
+
+  async function importRealMenu(menu) {
+    // 1) Copia di sicurezza di tutto quello che c'è ora (anche le foto), scaricata sul dispositivo
+    const photosCol = collection(db, "photos");
+    const [cs, is, ps] = await Promise.all([getDocs(categoriesCol), getDocs(itemsCol), getDocs(photosCol)]);
+    const dump = (snap) => snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    downloadJSON({
+      progetto: window.ZANZIBAR_FIREBASE_CONFIG.projectId,
+      esportato: new Date().toISOString(),
+      collezioni: { categories: dump(cs), items: dump(is), photos: dump(ps) }
+    }, `zanzibar-copia-di-sicurezza-${stamp}.json`);
+
+    // 2) Sostituzione in un'unica operazione: o va a buon fine tutta, o non cambia niente
+    const batch = writeBatch(db);
+    let ops = 0;
+    [cs, is, ps].forEach((snap) => snap.docs.forEach((d) => { batch.delete(d.ref); ops++; }));
+    let count = 0;
+    menu.forEach((c, ci) => {
+      const cref = doc(categoriesCol);
+      batch.set(cref, {
+        name: String(c.categoria),
+        order: ci + 1,
+        section: SECTIONS[c.sezione] ? c.sezione : SECTION_KEYS[0],
+        note: String(c.nota || ""),
+        visible: c.visibile !== false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      ops++;
+      (c.voci || []).forEach((v, vi) => {
+        const prices = (v.prezzi || [])
+          .filter((p) => p && p.valore !== null && p.valore !== "" && isFinite(Number(p.valore)))
+          .slice(0, 2)
+          .map((p) => ({ label: String(p.etichetta || ""), value: Math.round(Number(p.valore) * 100) / 100 }));
+        batch.set(doc(itemsCol), {
+          name: String(v.nome),
+          description: String(v.desc || ""),
+          prices,
+          symbol: String(v.simbolo || ""),
+          visible: v.visibile !== false,
+          hasPhoto: false,
+          categoryId: cref.id,
+          order: vi + 1,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        ops++;
+        count++;
+      });
+    });
+    if (ops > 500) throw { code: "too-many" };
+    await confirmed(batch.commit(), 45000);
+    searchInput.value = "";
+    showToast(`Menù vero importato: ${menu.length} categorie e ${count} voci`);
+  }
+  $$("[data-import]").forEach((b) => b.addEventListener("click", askImport));
 
   /* ---------- Apertura / chiusura pannelli ---------- */
   let returnFocus = null;
@@ -491,7 +542,8 @@ function start() {
     el.hidden = false;
     document.body.classList.add("no-scroll");
     requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("is-open")));
-    setTimeout(() => focusEl && focusEl.focus({ preventScroll: true }), 300);
+    // sul telefono niente focus automatico sui campi: aprirebbe la tastiera e farebbe "saltare" la pagina
+    if (focusEl && window.matchMedia("(hover: hover)").matches) setTimeout(() => focusEl.focus({ preventScroll: true }), 300);
   }
   function closeLayer(el, delay) {
     el.classList.remove("is-open");
@@ -509,6 +561,7 @@ function start() {
   let editingItem = null;
 
   itemForm.addEventListener("input", (e) => e.target.classList.remove("is-invalid"));
+  $$("[data-symbol]", itemForm).forEach((b) => b.addEventListener("click", () => { F.symbol.value = b.dataset.symbol; }));
 
   /* ---------- Foto del prodotto ---------- */
   const photoBox = $("#photoBox");
@@ -518,7 +571,7 @@ function start() {
   const photoRemove = $("#photoRemove");
   const PHOTO_HINT = photoHint.textContent;
   // saved: foto già salvata (data URL o null) · next: undefined = invariata, stringa = nuova, null = da rimuovere
-  let photo = { saved: null, next: undefined, token: 0 };
+  let photo = { saved: null, next: undefined, token: 0, failed: false };
 
   function setPhotoHint(text, kind) {
     photoHint.textContent = text;
@@ -542,7 +595,7 @@ function start() {
 
   async function loadPhoto(item) {
     const token = ++photo.token;
-    photo = { saved: null, next: undefined, token };
+    photo = { saved: null, next: undefined, token, failed: false };
     photoInput.value = "";
     setPhotoHint(PHOTO_HINT);
     showPhoto(null);
@@ -555,6 +608,7 @@ function start() {
       if (photo.next === undefined) showPhoto(photo.saved);
     } catch (err) {
       if (token !== photo.token) return;
+      photo.failed = true;
       console.error("[admin] Lettura foto non riuscita:", err);
       setPhotoHint("Non riesco a leggere la foto salvata: " + friendlyError(err), "error");
     } finally {
@@ -601,19 +655,22 @@ function start() {
     itemFormMsg.textContent = "";
     $$(".is-invalid", itemForm).forEach((el) => el.classList.remove("is-invalid"));
     $("#itemFormEyebrow").textContent = item ? "Modifica voce" : "Nuova voce";
-    $("#itemFormTitle").textContent = item ? item.name : "Aggiungi al menu";
-    itemSaveBtn.textContent = item ? "Salva modifiche" : "Aggiungi al menu";
+    $("#itemFormTitle").textContent = item ? item.name : "Aggiungi al menù";
+    itemSaveBtn.textContent = item ? "Salva" : "Aggiungi";
 
     const v = item || {};
     F.name.value = v.name || "";
     F.categoryId.value = categoryById(v.categoryId) ? v.categoryId
       : categoryById(categoryId) ? categoryId
-      : categoryById(categoryFilter.value) ? categoryFilter.value
       : categories[0].id;
-    F.price.value = v.price != null ? v.price : "";
     F.description.value = v.description || "";
-    F.tag.value = v.tag || "";
-    F.available.checked = v.available !== false;
+    const ps = item ? pricesOf(item) : [];
+    F.label1.value = ps[0] ? ps[0].label || "" : "";
+    F.value1.value = ps[0] ? money(ps[0].value) : "";
+    F.label2.value = ps[1] ? ps[1].label || "" : "";
+    F.value2.value = ps[1] ? money(ps[1].value) : "";
+    F.symbol.value = v.symbol || "";
+    F.visible.checked = item ? isVisible(item) : true;
     loadPhoto(item);
 
     openLayer(itemDrawer, F.name);
@@ -623,21 +680,40 @@ function start() {
   $("#newItemBtn").addEventListener("click", () => openItemForm(null));
   $$("[data-close-item]").forEach((el) => el.addEventListener("click", closeItemForm));
 
+  // "6,50" → 6.5 · vuoto → null · non valido → NaN
+  function parsePrice(text) {
+    const t = String(text).replace(/[\s€]/g, "").replace(",", ".");
+    if (!t) return null;
+    const n = Number(t);
+    return isFinite(n) && n >= 0 && n <= 100000 ? Math.round(n * 100) / 100 : NaN;
+  }
+
   function readItemForm() {
     const errors = [];
     const mark = (el, bad) => el.classList.toggle("is-invalid", bad);
     const name = F.name.value.trim();
-    const price = Number(String(F.price.value).replace(",", "."));
     const categoryId = F.categoryId.value;
 
     mark(F.name, !name);
     if (!name) errors.push("il nome");
-    const badPrice = F.price.value === "" || !isFinite(price) || price < 0;
-    mark(F.price, badPrice);
-    if (badPrice) errors.push("un prezzo valido");
     const badCat = !categoryById(categoryId);
     mark(F.categoryId, badCat);
     if (badCat) errors.push("la categoria");
+
+    const prices = [];
+    let badPrice = false;
+    [[F.label1, F.value1], [F.label2, F.value2]].forEach(([labelEl, valueEl]) => {
+      const label = labelEl.value.trim();
+      const value = parsePrice(valueEl.value);
+      if (value === null) {
+        // etichetta senza prezzo: probabilmente il prezzo è stato dimenticato
+        if (label) { mark(valueEl, true); badPrice = true; }
+        return;
+      }
+      if (Number.isNaN(value)) { mark(valueEl, true); badPrice = true; return; }
+      prices.push({ label, value });
+    });
+    if (badPrice) errors.push("un prezzo valido (es. 6,50) oppure cancella l'etichetta");
 
     if (errors.length) return { errors };
 
@@ -647,9 +723,9 @@ function start() {
       data: {
         name,
         description: F.description.value.trim(),
-        price: Math.round(price * 100) / 100,
-        available: F.available.checked,
-        tag: F.tag.value.trim(),
+        prices,
+        symbol: F.symbol.value.trim(),
+        visible: F.visible.checked,
         categoryId,
         order: keepOrder ? Number(editingItem.order) || 0 : nextOrder(itemsOf(categoryId)),
         updatedAt: serverTimestamp()
@@ -680,15 +756,20 @@ function start() {
       itemFormMsg.textContent = reportError("Salvataggio foto", { code: "photo/offline" });
       return;
     }
+    // hasPhoto dice al sito se la voce si può aprire per vedere la foto
+    data.hasPhoto = photoChanged ? !!photo.next
+      : photo.failed ? !!(editingItem && editingItem.hasPhoto)
+      : !!photo.saved;
+
     itemSaveBtn.disabled = true;
     const label = itemSaveBtn.textContent;
     itemSaveBtn.textContent = "Salvataggio…";
     try {
-      // Voce e foto vengono salvate insieme: o tutto o niente
+      // Voce e foto vengono salvate insieme: o tutto o niente.
+      // set (non update) riscrive la voce intera: toglie anche i campi del vecchio formato.
       const batch = writeBatch(db);
       const ref = editingItem ? doc(db, "items", editingItem.id) : doc(itemsCol);
-      if (editingItem) batch.update(ref, data);
-      else batch.set(ref, { ...data, createdAt: serverTimestamp() });
+      batch.set(ref, { ...data, createdAt: (editingItem && editingItem.createdAt) || serverTimestamp() });
       if (photoChanged) {
         const photoRef = doc(db, "photos", ref.id);
         if (photo.next) batch.set(photoRef, { data: photo.next, updatedAt: serverTimestamp() });
@@ -697,7 +778,7 @@ function start() {
       await confirmed(batch.commit(), photoChanged ? 30000 : 15000);
       if (photoChanged) photo.saved = photo.next;
       const what = photoChanged ? (photo.next ? " con la nuova foto" : ", foto rimossa") : "";
-      showToast(editingItem ? `"${data.name}" aggiornato${what}` : `"${data.name}" aggiunto al menu${what}`);
+      showToast(editingItem ? `"${data.name}" aggiornato${what}` : `"${data.name}" aggiunto al menù${what}`);
       closeItemForm();
     } catch (err) {
       itemFormMsg.textContent = reportError("Salvataggio voce", err);
@@ -710,6 +791,7 @@ function start() {
   /* ---------- Form categoria ---------- */
   const categoryDialog = $("#categoryDialog");
   const categoryForm = $("#categoryForm");
+  const C = categoryForm.elements;
   const categoryName = $("#cName");
   const categoryFormMsg = $("#categoryFormMsg");
   const categorySaveBtn = $("#categorySaveBtn");
@@ -721,8 +803,11 @@ function start() {
     categoryFormMsg.textContent = "";
     categoryName.classList.remove("is-invalid");
     $("#categoryFormEyebrow").textContent = category ? "Modifica categoria" : "Nuova categoria";
-    $("#categoryFormTitle").textContent = category ? "Rinomina categoria" : "Aggiungi categoria";
+    $("#categoryFormTitle").textContent = category ? category.name : "Aggiungi categoria";
     categoryName.value = category ? category.name : "";
+    C.section.value = category && SECTIONS[category.section] ? category.section : SECTION_KEYS[0];
+    C.note.value = category ? category.note || "" : "";
+    C.visible.checked = category ? category.visible !== false : true;
     categorySaveBtn.textContent = category ? "Salva" : "Crea categoria";
     openLayer(categoryDialog, categoryName);
   }
@@ -747,13 +832,25 @@ function start() {
       categoryFormMsg.textContent = "Esiste già una categoria con questo nome.";
       return;
     }
+    const section = SECTIONS[C.section.value] ? C.section.value : SECTION_KEYS[0];
+    // cambiando sezione (o se è nuova) la categoria va in fondo alla sezione scelta
+    const keepOrder = editingCategory && editingCategory.section === section;
+    const data = {
+      name,
+      section,
+      note: C.note.value.trim(),
+      visible: C.visible.checked,
+      order: keepOrder ? Number(editingCategory.order) || 0 : nextOrder(catsOf(section)),
+      createdAt: (editingCategory && editingCategory.createdAt) || serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
     categorySaveBtn.disabled = true;
     try {
       if (editingCategory) {
-        await confirmed(updateDoc(doc(db, "categories", editingCategory.id), { name, updatedAt: serverTimestamp() }));
-        showToast(`Categoria rinominata in "${name}"`);
+        await confirmed(setDoc(doc(db, "categories", editingCategory.id), data));
+        showToast(`Categoria "${name}" salvata`);
       } else {
-        await confirmed(addDoc(categoriesCol, { name, order: nextOrder(categories), createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+        await confirmed(addDoc(categoriesCol, data));
         showToast(`Categoria "${name}" creata`);
       }
       closeCategoryForm();
@@ -764,57 +861,75 @@ function start() {
     }
   });
 
-  /* ---------- Eliminazione ---------- */
+  /* ---------- Conferme (eliminazione e importazione) ---------- */
   const confirmDialog = $("#confirmDialog");
-  let deleting = null;
+  const confirmOk = $("#confirmOk");
+  let pending = null;
 
-  function askDelete(target) {
-    deleting = target;
-    if (target.type === "category") {
-      const n = itemsOf(target.data.id).length;
-      $("#confirmTitle").textContent = "Eliminare la categoria?";
-      $("#confirmText").textContent = `"${target.data.name}"` +
-        (n ? ` e ${n === 1 ? "la sua voce" : "le sue " + n + " voci"} verranno rimosse dal menu.` : " verrà rimossa dal menu.") +
-        " L'operazione non può essere annullata.";
-    } else {
-      $("#confirmTitle").textContent = "Eliminare la voce?";
-      $("#confirmText").textContent = `"${target.data.name}" verrà rimosso dal menu. L'operazione non può essere annullata.`;
-    }
+  function askConfirm({ title, text, ok, run }) {
+    pending = run;
+    $("#confirmTitle").textContent = title;
+    $("#confirmText").textContent = text;
+    confirmOk.textContent = ok;
     openLayer(confirmDialog, $("[data-cancel].btn", confirmDialog));
   }
   function closeConfirm() {
-    deleting = null;
+    pending = null;
     closeLayer(confirmDialog, 450);
   }
   $$("[data-cancel]", confirmDialog).forEach((el) => el.addEventListener("click", closeConfirm));
 
-  $("#confirmDelete").addEventListener("click", async (e) => {
-    if (!deleting) return;
-    const btn = e.currentTarget;
-    const { type, data } = deleting;
-    btn.disabled = true;
+  confirmOk.addEventListener("click", async () => {
+    if (!pending || confirmOk.disabled) return;
+    const label = confirmOk.textContent;
+    confirmOk.disabled = true;
+    confirmOk.textContent = "Attendi…";
     try {
-      const batch = writeBatch(db);
-      if (type === "category") {
-        // La categoria viene eliminata insieme a tutte le sue voci
-        itemsOf(data.id).forEach((v) => {
+      await pending();
+      closeConfirm();
+    } catch (err) {
+      reportError("Operazione", err);
+    } finally {
+      confirmOk.disabled = false;
+      confirmOk.textContent = label;
+    }
+  });
+
+  function askDeleteCategory(c) {
+    const list = itemsOf(c.id);
+    const n = list.length;
+    askConfirm({
+      title: "Eliminare la categoria?",
+      text: `"${c.name}"` + (n ? ` e ${n === 1 ? "la sua voce" : "le sue " + n + " voci"} verranno eliminate.` : " verrà eliminata.") +
+        " L'operazione non può essere annullata. Se vuoi solo toglierla per un po', usa l'occhio per nasconderla.",
+      ok: "Elimina",
+      run: async () => {
+        const batch = writeBatch(db);
+        list.forEach((v) => {
           batch.delete(doc(db, "items", v.id));
           batch.delete(doc(db, "photos", v.id));
         });
-        batch.delete(doc(db, "categories", data.id));
-      } else {
-        batch.delete(doc(db, "items", data.id));
-        batch.delete(doc(db, "photos", data.id));   // anche la sua foto, se c'è
+        batch.delete(doc(db, "categories", c.id));
+        await confirmed(batch.commit());
+        showToast(`"${c.name}" eliminata`);
       }
-      await confirmed(batch.commit());
-      showToast(`"${data.name}" eliminat${type === "category" ? "a" : "o"}`);
-      closeConfirm();
-    } catch (err) {
-      reportError("Eliminazione", err);
-    } finally {
-      btn.disabled = false;
-    }
-  });
+    });
+  }
+
+  function askDeleteItem(v) {
+    askConfirm({
+      title: "Eliminare la voce?",
+      text: `"${v.name}" verrà eliminata dal menù, insieme alla sua foto. L'operazione non può essere annullata. Se vuoi solo toglierla per un po', usa l'occhio per nasconderla.`,
+      ok: "Elimina",
+      run: async () => {
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "items", v.id));
+        batch.delete(doc(db, "photos", v.id));   // anche la sua foto, se c'è
+        await confirmed(batch.commit());
+        showToast(`"${v.name}" eliminata`);
+      }
+    });
+  }
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;

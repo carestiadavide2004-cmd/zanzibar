@@ -9,6 +9,7 @@
       "firestore.rules",
       "GUIDA-FIREBASE.md",
       "README.md",
+      "backup/**",
       "**/.*",
       "**/node_modules/**"
     ],

@@ -2,8 +2,8 @@
    ZANZIBAR — DATI DEL SITO
    Qui si modificano testi, contatti, orari e foto.
    Il MENU si gestisce dal pannello /admin (Firebase): quello
-   scritto qui sotto serve per l'importazione iniziale e come
-   riserva se il database non è configurato o non risponde.
+   scritto qui sotto è il menu vero, usato dal pulsante "Importa
+   menù vero" e come riserva se il database non risponde.
    Regole: mantieni virgolette "..." e virgole tra gli elementi.
    ========================================================= */
 
@@ -37,74 +37,76 @@ window.ZANZIBAR = {
   ],
 
   /* ---------- MENU ----------
-     Ogni categoria ha: nome e lista di voci.
-     Ogni voce: nome, desc (facoltativa), prezzo (numero), tag (facoltativo)
+     Il menu VERO di Zanzibar. Il pannello /admin lo usa per il pulsante
+     "Importa menù vero"; il sito lo mostra finché nel database non c'è il menu vero.
+     Categoria: categoria, sezione ("food" o "drink"), nota (facoltativa), voci.
+     Voce: nome, desc (facoltativa), prezzi (da 0 a 2: { etichetta, valore }), simbolo (facoltativo).
+     prezzi: [] = nessun prezzo mostrato.
   */
+  sezioni: { food: "Menù Food", drink: "Drink" },
+
   menu: [
     {
-      categoria: "Caffetteria",
+      categoria: "Aperitivi", sezione: "food",
       voci: [
-        { nome: "Espresso",         desc: "Miscela 100% arabica, tostatura media.", prezzo: 1.20 },
-        { nome: "Cappuccino",       desc: "Espresso e latte montato vellutato.",     prezzo: 1.60 },
-        { nome: "Caffè al ginseng", desc: "Piccolo o grande.",                       prezzo: 1.80 },
-        { nome: "Marocchino",       desc: "Espresso, cacao e schiuma di latte.",     prezzo: 1.80 },
-        { nome: "Latte macchiato",  desc: "Con latte vegetale su richiesta.",        prezzo: 2.00, tag: "Veg" },
-        { nome: "Tè e infusi",      desc: "Selezione di tè verdi, neri e tisane.",   prezzo: 2.50 }
+        { nome: "Tagliere salumi e formaggi", prezzi: [{ etichetta: "", valore: 3.00 }] },
+        { nome: "Tagliere Plus", desc: "salumi, formaggi, verdure grigliate", prezzi: [{ etichetta: "", valore: 7.00 }] },
+        { nome: "Tagliere Zanzibar", desc: "3 finger food, Tagliere Plus, fritti mix", prezzi: [{ etichetta: "", valore: 10.00 }] },
+        { nome: "Aperitivo cenato", desc: "9 finger food, tagliere salumi e formaggi, verdure grigliate, fritti mix, patate al forno", prezzi: [{ etichetta: "", valore: 18.00 }] }
       ]
     },
     {
-      categoria: "Colazioni",
+      categoria: "Panini", sezione: "food",
       voci: [
-        { nome: "Cornetto",         desc: "Vuoto, crema, marmellata o pistacchio.",       prezzo: 1.30 },
-        { nome: "Cornetto integrale", desc: "Con miele millefiori.",                      prezzo: 1.50 },
-        { nome: "Toast Zanzibar",   desc: "Pane in cassetta, prosciutto cotto e formaggio.", prezzo: 4.00 },
-        { nome: "Yogurt bowl",      desc: "Yogurt greco, granola, frutta fresca e miele.", prezzo: 6.50, tag: "Veg" },
-        { nome: "Avocado toast",    desc: "Pane ai cereali, avocado, lime e semi.",        prezzo: 7.50, tag: "Vegan" },
-        { nome: "Spremuta d'arancia", desc: "Arance fresche spremute al momento.",         prezzo: 4.00 }
+        { nome: "Classic Burger", desc: "hamburger 100 g o 200 g di Black Angus, insalata, pomodoro, salse a scelta", prezzi: [{ etichetta: "100 g", valore: 6.50 }, { etichetta: "200 g", valore: 9.00 }] },
+        { nome: "Cheese Burger", desc: "hamburger 100 g o 200 g di Black Angus, cheddar, bacon, pomodoro, insalata, salse a scelta", prezzi: [{ etichetta: "100 g", valore: 6.50 }, { etichetta: "200 g", valore: 9.00 }] },
+        { nome: "Pistacchioso", desc: "hamburger 100 g o 200 g di Black Angus, pistacchio, mortadella, stracciatella", prezzi: [{ etichetta: "100 g", valore: 8.00 }, { etichetta: "200 g", valore: 10.50 }] },
+        { nome: "Patatosa", desc: "hamburger 100 g o 200 g di Black Angus, crema di patate, funghi, maionese al tartufo, provola affumicata", prezzi: [{ etichetta: "100 g", valore: 7.50 }, { etichetta: "200 g", valore: 10.00 }] },
+        { nome: "Tacos", desc: "manzo e fagioli messicani · pollo e mango · salmone", prezzi: [{ etichetta: "", valore: 9.00 }] },
+        { nome: "Hot Dog", desc: "wurstel e salse", prezzi: [{ etichetta: "", valore: 4.00 }] },
+        { nome: "Salsiccia e Friarielli", desc: "salsiccia, crema di friarielli, provola", prezzi: [{ etichetta: "", valore: 6.50 }] },
+        { nome: "Pulled Pork", desc: "pulled pork, cipolla caramellata, provola, BBQ", prezzi: [{ etichetta: "", valore: 7.50 }] },
+        { nome: "Crispy Chicken Burger", desc: "filetto di pollo fritto, insalata, salsa cocktail", prezzi: [{ etichetta: "", valore: 7.00 }] },
+        { nome: "Zanzi Burger", desc: "hamburger 100 g o 200 g di Black Angus, uovo, bacon, cipolla croccante, salse a scelta", prezzi: [{ etichetta: "100 g", valore: 8.50 }, { etichetta: "200 g", valore: 11.00 }] },
+        { nome: "Mega Burger", desc: "hamburger da 350 g, cheddar, bacon, cipolla croccante, salsa burger", prezzi: [{ etichetta: "", valore: 12.00 }] },
+        { nome: "Spicy Burger", simbolo: "★", desc: "hamburger 100 g o 200 g di Black Angus, crema di peperoncino, jalapeños, anelli di cipolla, insalata", prezzi: [{ etichetta: "100 g", valore: 7.50 }, { etichetta: "200 g", valore: 10.00 }] },
+        { nome: "Piadina Crudo", desc: "prosciutto crudo, formaggio, insalata, pomodoro", prezzi: [{ etichetta: "", valore: 6.00 }] },
+        { nome: "Piadina Cotto", desc: "prosciutto cotto, formaggio, insalata, pomodoro", prezzi: [{ etichetta: "", valore: 5.50 }] }
       ]
     },
     {
-      categoria: "Aperitivi",
+      categoria: "Fritteria", sezione: "food", nota: "Supplementi € 0,50",
       voci: [
-        { nome: "Spritz Aperol",    desc: "Aperol, prosecco, soda, arancia.",              prezzo: 7.00 },
-        { nome: "Spritz Campari",   desc: "Campari, prosecco, soda.",                      prezzo: 7.00 },
-        { nome: "Hugo",             desc: "Sciroppo di sambuco, prosecco, menta, lime.",   prezzo: 7.00 },
-        { nome: "Calice di vino",   desc: "Bianco, rosso o bollicine della casa.",         prezzo: 6.00 },
-        { nome: "Tagliere Zanzibar", desc: "Salumi, formaggi, olive e focaccia (per 2).",  prezzo: 16.00 },
-        { nome: "Analcolico tropicale", desc: "Ananas, maracuja, lime e ginger beer.",     prezzo: 6.00, tag: "Analcolico" }
+        { nome: "Dippers", prezzi: [{ etichetta: "", valore: 4.00 }] },
+        { nome: "Patatine cheddar e bacon", prezzi: [{ etichetta: "", valore: 5.00 }] },
+        { nome: "Stick di patatine fritte", prezzi: [{ etichetta: "", valore: 4.00 }] },
+        { nome: "Olive ascolane (5 pz)", prezzi: [{ etichetta: "", valore: 4.50 }] },
+        { nome: "Nuggets di pollo (5 pz)", prezzi: [{ etichetta: "", valore: 4.50 }] },
+        { nome: "Crocchette di patate (5 pz)", prezzi: [{ etichetta: "", valore: 4.00 }] },
+        { nome: "Alette di pollo (5 pz)", prezzi: [{ etichetta: "", valore: 5.50 }] },
+        { nome: "Supplì (3 pz)", prezzi: [] },
+        { nome: "Mini supplì (5 pz)", prezzi: [{ etichetta: "", valore: 4.50 }] },
+        { nome: "Onion rings (5 pz)", prezzi: [{ etichetta: "", valore: 4.00 }] },
+        { nome: "Jalapeños (5 pz)", prezzi: [{ etichetta: "", valore: 4.50 }] },
+        { nome: "Chele di granchio (5 pz)", prezzi: [{ etichetta: "", valore: 5.50 }] },
+        { nome: "Gamberi in tempura (5 pz)", prezzi: [{ etichetta: "", valore: 6.00 }] },
+        { nome: "Mix fritto (5 pz)", prezzi: [{ etichetta: "", valore: 4.50 }] }
       ]
     },
     {
-      categoria: "Cocktail",
+      categoria: "Spritz", sezione: "drink",
       voci: [
-        { nome: "Zanzibar Mule",    desc: "Rum speziato, ginger beer, lime e cannella.",   prezzo: 10.00, tag: "Signature" },
-        { nome: "Spice Island",     desc: "Gin, chiodi di garofano, pompelmo rosa, tonica.", prezzo: 11.00, tag: "Signature" },
-        { nome: "Negroni",          desc: "Gin, vermouth rosso, bitter.",                  prezzo: 9.00 },
-        { nome: "Mojito",           desc: "Rum bianco, lime, menta, zucchero di canna, soda.", prezzo: 9.00 },
-        { nome: "Piña Colada",      desc: "Rum, ananas, crema di cocco.",                  prezzo: 10.00 },
-        { nome: "Gin Tonic",        desc: "Selezione di gin premium e toniche.",           prezzo: 10.00 }
+        { nome: "Violet Spritz", prezzi: [] },
+        { nome: "Venturo Spritz", prezzi: [] },
+        { nome: "Watermelon Spritz", prezzi: [] },
+        { nome: "Beer Spritz", prezzi: [] },
+        { nome: "Mango Spritz", prezzi: [] },
+        { nome: "Ginger Spritz", prezzi: [] }
       ]
     },
     {
-      categoria: "Panini & Snack",
-      voci: [
-        { nome: "Club sandwich",    desc: "Pollo, bacon, lattuga, pomodoro, maionese. Con patatine.", prezzo: 11.00 },
-        { nome: "Panino Caprese",   desc: "Mozzarella, pomodoro, basilico, olio EVO.",     prezzo: 7.00, tag: "Veg" },
-        { nome: "Piadina crudo",    desc: "Prosciutto crudo, stracchino, rucola.",          prezzo: 7.50 },
-        { nome: "Patatine fritte",  desc: "Con salse a scelta.",                           prezzo: 4.50 },
-        { nome: "Nachos",           desc: "Con guacamole, salsa cheddar e jalapeños.",      prezzo: 7.00 },
-        { nome: "Olive all'ascolana", desc: "Porzione da 8 pezzi.",                         prezzo: 5.50 }
-      ]
-    },
-    {
-      categoria: "Dolci",
-      voci: [
-        { nome: "Tiramisù",         desc: "Ricetta classica della casa.",                  prezzo: 5.50 },
-        { nome: "Cheesecake al mango", desc: "Base croccante e coulis di mango.",          prezzo: 6.00 },
-        { nome: "Tortino al cioccolato", desc: "Cuore fondente, servito tiepido.",         prezzo: 6.00 },
-        { nome: "Macedonia tropicale", desc: "Frutta fresca di stagione e cocco.",         prezzo: 5.00, tag: "Vegan" },
-        { nome: "Affogato al caffè", desc: "Gelato alla vaniglia ed espresso.",           prezzo: 4.50 }
-      ]
+      categoria: "Gin", sezione: "drink",
+      voci: []
     }
   ],
 

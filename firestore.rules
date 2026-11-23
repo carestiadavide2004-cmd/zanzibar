@@ -22,21 +22,39 @@ service cloud.firestore {
       return v is int || v is float;
     }
 
+    // Categoria: nome, ordine, macro-sezione ("food" = Menù Food, "drink" = Drink),
+    // nota facoltativa in fondo (es. "Supplementi € 0,50") e visibile/nascosta.
     function isValidCategory() {
       let c = request.resource.data;
-      return c.keys().hasOnly(["name", "order", "createdAt", "updatedAt"])
+      return c.keys().hasOnly(["name", "order", "section", "note", "visible", "createdAt", "updatedAt"])
         && c.name is string && c.name.size() > 0 && c.name.size() <= 60
-        && isNumber(c.order);
+        && isNumber(c.order)
+        && c.section in ["food", "drink"]
+        && c.note is string && c.note.size() <= 200
+        && c.visible is bool;
     }
 
+    // Un prezzo: etichetta facoltativa (es. "100 g") e valore in euro
+    function isPrice(p) {
+      return p is map
+        && p.keys().hasOnly(["label", "value"])
+        && p.label is string && p.label.size() <= 20
+        && isNumber(p.value) && p.value >= 0 && p.value <= 100000;
+    }
+
+    // Voce: da 0 a 2 prezzi (0 = nessun prezzo mostrato), simbolo facoltativo (es. ★),
+    // visibile/nascosta e "hasPhoto" (true se nella collezione photos c'è la sua foto).
     function isValidItem() {
       let v = request.resource.data;
-      return v.keys().hasOnly(["name", "description", "price", "available", "tag", "categoryId", "order", "createdAt", "updatedAt"])
+      return v.keys().hasOnly(["name", "description", "prices", "symbol", "visible", "hasPhoto", "categoryId", "order", "createdAt", "updatedAt"])
         && v.name is string && v.name.size() > 0 && v.name.size() <= 120
         && v.description is string && v.description.size() <= 500
-        && isNumber(v.price) && v.price >= 0 && v.price <= 100000
-        && v.available is bool
-        && v.tag is string && v.tag.size() <= 30
+        && v.prices is list && v.prices.size() <= 2
+        && (v.prices.size() < 1 || isPrice(v.prices[0]))
+        && (v.prices.size() < 2 || isPrice(v.prices[1]))
+        && v.symbol is string && v.symbol.size() <= 4
+        && v.visible is bool
+        && v.hasPhoto is bool
         && isNumber(v.order)
         // la categoria deve esistere (anche se creata nella stessa operazione)
         && v.categoryId is string

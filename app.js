@@ -11,17 +11,63 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   };
-  var slug = function (s) { return "cat-" + s.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); };
-  var price = function (n) { return "<small>" + esc(D.valuta) + "</small>" + Number(n).toFixed(2).replace(".", ","); };
-  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var slug = function (s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x"; };
   var root = document.documentElement;
+
+  /* ---------- PREZZI ---------- */
+  // Prezzi validi (0, 1 o 2). Nel menu: "€ 6,50 / 9,00" come nel menu stampato.
+  function validPrices(list) {
+    return (Array.isArray(list) ? list : []).filter(function (p) {
+      return p && p.value !== null && p.value !== "" && isFinite(Number(p.value)) && Number(p.value) >= 0;
+    });
+  }
+  var money = function (n) { return Number(n).toFixed(2).replace(".", ","); };
+  function priceText(list) {
+    var p = validPrices(list);
+    return p.length ? "€ " + p.map(function (x) { return money(x.value); }).join(" / ") : "";
+  }
+  // Versione per chi usa lo screen reader: "100 g 6,50 euro, 200 g 9,00 euro"
+  function priceSpeech(list) {
+    return validPrices(list).map(function (x) { return (x.label ? x.label + " " : "") + money(x.value) + " euro"; }).join(", ");
+  }
+
+  /* ---------- DATI ---------- */
+  // Formato comune usato dal sito: [{ id, name, section, note, visible, items: [{ id, name, desc, prices, symbol, visible, hasPhoto }] }]
+  var SECTIONS = D.sezioni || { food: "Menù Food", drink: "Drink" };
+
+  function fromData(menu) {
+    return (menu || []).map(function (c, ci) {
+      return {
+        id: "d" + ci, name: c.categoria, section: c.sezione || "food", note: c.nota || "", visible: c.visibile !== false,
+        items: (c.voci || []).map(function (v) {
+          return {
+            id: null, name: v.nome, desc: v.desc || "", symbol: v.simbolo || "", visible: v.visibile !== false, hasPhoto: false,
+            prices: (v.prezzi || []).map(function (p) { return { label: p.etichetta || "", value: p.valore }; })
+          };
+        })
+      };
+    });
+  }
+
+  // Tiene solo ciò che si deve vedere: categorie e voci visibili, niente categorie vuote
+  function prepare(cats) {
+    return Object.keys(SECTIONS).map(function (key) {
+      var list = cats.filter(function (c) { return c.section === key && c.visible !== false; })
+        .map(function (c) {
+          return Object.assign({}, c, { items: (c.items || []).filter(function (v) { return v.visible !== false && v.name; }) });
+        })
+        .filter(function (c) { return c.items.length; });
+      return { id: key, title: SECTIONS[key], cats: list };
+    }).filter(function (s) { return s.cats.length; });
+  }
 
   /* ---------- MENU ---------- */
   // Il menu arriva da Firestore (firebase-menu.js) e si aggiorna in tempo reale.
-  // Se Firebase non è configurato o non risponde, si usa quello scritto in data.js.
+  // Se Firebase non risponde, o nel database c'è ancora il vecchio menu di esempio, si usa quello di data.js.
   var liveMode = !!window.ZANZIBAR_FIREBASE_READY;
   var tabsEl = $("#tabs");
   var menuEl = $("#menu");
+  var heroTitle = $("#heroTitle");
   var tabs = [];
   var bar = null;
   var clickLock = false;
@@ -29,43 +75,74 @@
   var menuLoaded = false;
   var revealed = {};   // categorie già comparse: non rifanno l'animazione a ogni aggiornamento
   var io = null, reveal = null;
+  var sheetItems = [];  // voci con foto, per aprire la scheda
 
-  var currentMenu = [];
+  var CAMERA = '<svg class="item-cam" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
 
-  function renderMenu(menu) {
-    currentMenu = menu;
+  function renderItem(v, cat) {
+    var pt = priceText(v.prices);
+    var k = -1;
+    if (v.hasPhoto && v.id) { k = sheetItems.length; sheetItems.push({ cat: cat.name, item: v }); }
+    var open = k >= 0 ? ' data-k="' + k + '" role="button" tabindex="0" aria-haspopup="dialog"' : "";
+    return '<article class="item' + (k >= 0 ? " has-photo" : "") + '"' + open + ">" +
+      '<div class="item-head">' +
+        '<h3 class="item-name">' + esc(v.name) +
+          (v.symbol ? ' <span class="item-sym">' + esc(v.symbol) + "</span>" : "") +
+          (k >= 0 ? CAMERA + '<span class="sr-only"> (apri la foto)</span>' : "") +
+        "</h3>" +
+        (pt ? '<span class="item-price" aria-hidden="true">' + esc(pt) + '</span><span class="sr-only">' + esc(priceSpeech(v.prices)) + "</span>" : "") +
+      "</div>" +
+      (v.desc ? '<p class="item-desc">' + esc(v.desc) + "</p>" : "") +
+      "</article>";
+  }
+
+  function renderCat(c, anchor) {
+    // senza descrizioni (es. Fritteria) le voci sono più compatte, come nel menu stampato
+    var compact = !c.items.some(function (v) { return v.desc; });
+    return '<section class="cat' + (compact ? " cat--compact" : "") + '" id="' + anchor + '">' +
+      '<h2 class="cat-title"><span>' + esc(c.name) + "</span></h2>" +
+      '<div class="items" style="--rows:' + Math.ceil(c.items.length / 2) + '">' +
+        c.items.map(function (v) { return renderItem(v, c); }).join("") +
+      "</div>" +
+      (c.note ? '<p class="cat-note">' + esc(c.note) + "</p>" : "") +
+      "</section>";
+  }
+
+  function renderMenu(cats) {
+    var sections = prepare(cats);
     var activeId = current ? current.dataset.target : null;
+    sheetItems = [];
 
-    if (!menu.length) {
+    if (!sections.length) {
       tabsEl.innerHTML = "";
       tabs = []; bar = null; current = null;
       menuEl.innerHTML = '<p class="menu-empty">Il menu è in aggiornamento.<br>Chiedi al nostro staff le proposte di oggi.</p>';
       return;
     }
 
-    tabsEl.innerHTML = menu.map(function (c) {
-      return '<button class="tab" data-target="' + slug(c.categoria) + '">' + esc(c.categoria) + "</button>";
-    }).join("") + '<span class="tabs-bar" aria-hidden="true"></span>';
+    heroTitle.textContent = sections[0].title;
+    var anchors = {};
+    var anchorOf = function (c) {
+      var a = "cat-" + slug(c.name), n = 2;
+      while (anchors[a]) a = "cat-" + slug(c.name) + "-" + n++;
+      anchors[a] = true;
+      return a;
+    };
 
-    menuEl.innerHTML = menu.map(function (c, i) {
-      return '<section class="cat" id="' + slug(c.categoria) + '">' +
-        '<header class="cat-head"><span class="cat-num">' + pad(i + 1) + "</span>" +
-        '<h2 class="cat-title">' + esc(c.categoria) + "</h2></header>" +
-        c.voci.map(function (v, j) {
-          var off = v.disponibile === false;
-          return '<article class="item' + (off ? " is-off" : "") + '" data-c="' + i + '" data-v="' + j + '" role="button" tabindex="0" aria-haspopup="dialog" aria-label="' + esc(v.nome) + ': apri la scheda">' +
-            '<div class="item-head">' +
-              '<span class="item-name">' + esc(v.nome) + (v.tag ? '<span class="tag">' + esc(v.tag) + "</span>" : "") + "</span>" +
-              '<span class="item-dots" aria-hidden="true"></span>' +
-              '<span class="item-price">' + price(v.prezzo) + "</span>" +
-              '<svg class="item-more" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-            "</div>" +
-            (v.desc ? '<p class="item-desc">' + esc(v.desc) + "</p>" : "") +
-            (off ? '<p class="item-off">Non disponibile</p>' : "") +
-            "</article>";
-        }).join("") +
-        "</section>";
-    }).join("");
+    var tabsHtml = "", menuHtml = "";
+    sections.forEach(function (s, si) {
+      menuHtml += '<div class="macro" id="sez-' + esc(s.id) + '">' +
+        (si > 0 ? '<header class="macro-head"><p class="kicker">' + esc(D.info.nome) + '</p><h2 class="macro-title">' + esc(s.title) + "</h2></header>" : "");
+      s.cats.forEach(function (c, ci) {
+        var a = anchorOf(c);
+        tabsHtml += '<button class="tab' + (si > 0 && ci === 0 ? " tab--group" : "") + '" data-target="' + a + '">' + esc(c.name) + "</button>";
+        menuHtml += renderCat(c, a);
+      });
+      menuHtml += "</div>";
+    });
+
+    tabsEl.innerHTML = tabsHtml + '<span class="tabs-bar" aria-hidden="true"></span>';
+    menuEl.innerHTML = menuHtml;
 
     tabs = $$(".tab", tabsEl);
     bar = $(".tabs-bar", tabsEl);
@@ -95,15 +172,21 @@
       }
     });
   }
-  // ricalcola quando il font è caricato o cambia la larghezza dello schermo
+  // ricalcola quando il font è caricato o cambia la LARGHEZZA dello schermo (non l'altezza: barra del browser)
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { moveBar(current); });
-  window.addEventListener("resize", function () { moveBar(current); });
+  var lastW = window.innerWidth;
+  window.addEventListener("resize", function () {
+    if (window.innerWidth === lastW) return;
+    lastW = window.innerWidth;
+    moveBar(current);
+  });
 
-  // ombra leggera sotto le categorie quando si scorre
-  var scrolled = false;
+  // ombra leggera sotto le categorie quando la barra si ferma in alto
+  var stuck = false;
+  var catbar = $(".catbar");
   window.addEventListener("scroll", function () {
-    var s = window.scrollY > 4;
-    if (s !== scrolled) { scrolled = s; root.classList.toggle("is-scrolled", s); }
+    var s = catbar.getBoundingClientRect().top <= 0.5;
+    if (s !== stuck) { stuck = s; root.classList.toggle("is-stuck", s); }
   }, { passive: true });
 
   tabsEl.addEventListener("click", function (e) {
@@ -111,9 +194,10 @@
     if (!t) return;
     setActive(t.dataset.target);
     clickLock = true;
-    document.getElementById(t.dataset.target).scrollIntoView({ behavior: "smooth", block: "start" });
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(t.dataset.target).scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     clearTimeout(tabsEl._t);
-    tabsEl._t = setTimeout(function () { clickLock = false; }, 700);
+    tabsEl._t = setTimeout(function () { clickLock = false; }, 800);
   });
 
   // evidenzia la categoria visibile durante lo scroll + comparsa morbida (una sola volta)
@@ -124,7 +208,7 @@
     io = new IntersectionObserver(function (entries) {
       if (clickLock) return;
       entries.forEach(function (en) { if (en.isIntersecting) setActive(en.target.id); });
-    }, { rootMargin: "-130px 0px -65% 0px" });
+    }, { rootMargin: "-80px 0px -60% 0px" });
 
     root.classList.add("js-reveal");
     reveal = new IntersectionObserver(function (entries) {
@@ -139,20 +223,20 @@
     });
   }
 
-  function setMenu(menu) {
+  function setMenu(cats) {
     menuLoaded = true;
     clearTimeout(fallbackTimer);
-    renderMenu(menu);
+    renderMenu(cats);
   }
-  function useFallbackMenu() { if (!menuLoaded) setMenu(D.menu); }
+  function useFallbackMenu() { if (!menuLoaded) setMenu(fromData(D.menu)); }
 
   // Se il database non risponde entro pochi secondi, mostra il menu di data.js
   var fallbackTimer = null;
   if (liveMode) {
     menuEl.innerHTML = '<div class="menu-loading" aria-label="Caricamento del menu"><span></span><span></span><span></span></div>';
-    fallbackTimer = setTimeout(useFallbackMenu, 8000);
+    fallbackTimer = setTimeout(useFallbackMenu, 6000);
   } else {
-    setMenu(D.menu);
+    setMenu(fromData(D.menu));
   }
 
   window.ZanzibarMenu = { setMenu: setMenu, useFallbackMenu: useFallbackMenu };
@@ -298,35 +382,30 @@
   var sheetOpen = false, sheetToken = 0, sheetReturn = null;
   var desktop = window.matchMedia("(min-width: 760px)");
 
-  // Segnaposto coordinato: tonalità scelta in base al nome, sempre uguale per lo stesso prodotto
-  var PH = ["ph-terracotta", "ph-palm", "ph-sand", "ph-wood"];
-  function phClass(name) {
-    var h = 0;
-    for (var k = 0; k < name.length; k++) h = (h * 31 + name.charCodeAt(k)) >>> 0;
-    return PH[h % PH.length];
-  }
-
-  function openSheet(ci, vi) {
-    var c = currentMenu[ci], v = c && c.voci[vi];
-    if (!v) return;
+  function openSheet(k) {
+    var entry = sheetItems[k];
+    if (!entry) return;
+    var v = entry.item;
     var token = ++sheetToken;
     sheetReturn = document.activeElement;
 
-    $("#sheetCat").textContent = c.categoria;
-    $("#sheetName").innerHTML = esc(v.nome) + (v.tag ? '<span class="tag">' + esc(v.tag) + "</span>" : "");
+    $("#sheetCat").textContent = entry.cat;
+    $("#sheetName").innerHTML = esc(v.name) + (v.symbol ? ' <span class="item-sym">' + esc(v.symbol) + "</span>" : "");
     $("#sheetDesc").textContent = v.desc || "";
     $("#sheetDesc").hidden = !v.desc;
-    $("#sheetPrice").innerHTML = price(v.prezzo);
-    $("#sheetOff").hidden = v.disponibile !== false;
-    card.classList.toggle("is-off", v.disponibile === false);
-    $("#sheetPhName").textContent = v.nome;
-    sheetPh.className = "sheet-ph " + phClass(v.nome);
+    // nella scheda i prezzi hanno anche l'etichetta: "100 g € 6,50 · 200 g € 9,00"
+    var ps = validPrices(v.prices);
+    $("#sheetPrice").innerHTML = ps.map(function (x) {
+      return "<span>" + (x.label ? "<small>" + esc(x.label) + "</small> " : "") + "€ " + money(x.value) + "</span>";
+    }).join('<i aria-hidden="true">·</i>');
+    $(".sheet-foot", sheet).hidden = !ps.length;
+    $("#sheetPhName").textContent = v.name;
 
     // Foto: parte nascosta sopra il segnaposto e compare in dissolvenza solo se si carica davvero
     sheetImg.classList.remove("is-loaded");
     sheetImg.parentNode.classList.remove("has-photo");
     sheetImg.removeAttribute("src");
-    sheetImg.alt = v.nome;
+    sheetImg.alt = v.name;
     getPhoto(v).then(function (src) {
       if (!src || token !== sheetToken) return;
       sheetImg.onload = function () {
@@ -348,9 +427,8 @@
   }
 
   function getPhoto(v) {
-    if (v.id && window.ZanzibarPhotos) return window.ZanzibarPhotos.get(v.id).catch(function () { return v.foto || null; })
-      .then(function (src) { return src || v.foto || null; });
-    return Promise.resolve(v.foto || null);
+    if (v.id && window.ZanzibarPhotos) return window.ZanzibarPhotos.get(v.id).catch(function () { return null; });
+    return Promise.resolve(null);
   }
 
   function closeSheet() {
@@ -369,13 +447,13 @@
   }
 
   menuEl.addEventListener("click", function (e) {
-    var it = e.target.closest(".item[data-c]");
+    var it = e.target.closest(".item[data-k]");
     if (!it) return;
     history.pushState({ sheet: 1 }, "");
-    openSheet(+it.dataset.c, +it.dataset.v);
+    openSheet(+it.dataset.k);
   });
   menuEl.addEventListener("keydown", function (e) {
-    if ((e.key === "Enter" || e.key === " ") && e.target.matches(".item[data-c]")) { e.preventDefault(); e.target.click(); }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches(".item[data-k]")) { e.preventDefault(); e.target.click(); }
   });
   $$("[data-close-sheet]", sheet).forEach(function (el) { el.addEventListener("click", closeSheetFromUser); });
 

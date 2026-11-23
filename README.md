@@ -5,9 +5,10 @@ Sito statico e leggerissimo, nessuna installazione. Il menu si gestisce dal **pa
 
 | File | A cosa serve |
 |---|---|
-| `data.js` | Testi, contatti, orari, foto, mappa. Il `menu` qui dentro è quello di partenza (importabile dal pannello) e di riserva |
+| `data.js` | Testi, contatti, orari, foto, mappa. Il `menu` qui dentro è il **menù vero** (pulsante "Importa menù vero" del pannello) e la riserva se il database non risponde o contiene ancora il menù di esempio |
 | `index.html` | Struttura della pagina |
-| `style.css` | Colori e stile (i colori principali sono in cima al file, in `:root`) |
+| `style.css` | Colori e stile, ripresi dal menù stampato (PDF): i colori sono in cima al file, in `:root` |
+| `fonts/` | Cormorant Garamond e Jost, ospitati nel sito (nessun font esterno) |
 | `app.js` | Logica (tab categorie, pannello hamburger, galleria, mappa) |
 | `firebase-config.js` | Chiavi Firebase ed email del proprietario |
 | `firebase-menu.js` | Legge il menu da Firestore in tempo reale e, solo quando si apre la scheda di un prodotto, la sua foto |
@@ -17,13 +18,20 @@ Sito statico e leggerissimo, nessuna installazione. Il menu si gestisce dal **pa
 ## Pannello di amministrazione
 Configurazione passo-passo in **`GUIDA-FIREBASE.md`**. Una volta configurato, apri `/admin`, accedi con
 email e password del proprietario e potrai aggiungere, modificare, riordinare ed eliminare categorie e voci
-(nome, descrizione, prezzo, etichetta, disponibilità e foto).
+(nome, descrizione, uno o due prezzi con etichetta, simbolo come la ★, foto, visibile/nascosta).
+Le categorie stanno in due sezioni, **Menù Food** e **Drink**, e possono avere una nota in fondo (es. "Supplementi € 0,50").
+Le categorie senza voci visibili non compaiono sul menù pubblico.
+
+Struttura dei dati in Firestore:
+- `categories`: `name`, `order`, `section` (`food` o `drink`), `note`, `visible`
+- `items`: `name`, `description`, `prices` (0–2 elementi `{ label, value }`), `symbol`, `visible`, `hasPhoto`, `categoryId`, `order`
+- `photos`: la foto della voce (stesso ID della voce)
 
 Le **foto dei prodotti** si scelgono nella modifica della voce (anche scattandole dal telefono): il pannello le riduce
 a 900px e le comprime in JPEG sotto i 150 KB, poi le salva nella collezione Firestore `photos` (un documento per voce,
 stesso ID). Sul sito si scaricano solo quando il cliente apre la scheda del prodotto; senza foto compare un segnaposto.
 
-Finché Firebase non è configurato, il sito mostra il menu scritto in `data.js`.
+Finché Firebase non risponde, o nel database c'è ancora il vecchio menù di esempio, il sito mostra il menù scritto in `data.js`.
 
 ## Aggiornare gli altri contenuti
 Apri `data.js` con un editor di testo:

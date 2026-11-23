@@ -6,39 +6,33 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Zanzibar · Bar &amp; Lounge — Menu</title>
   <meta name="description" content="Il menu di Zanzibar Bar & Lounge: caffetteria, colazioni, aperitivi, cocktail, snack e dolci.">
-  <meta name="theme-color" content="#f7f2ea" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#14110f" media="(prefers-color-scheme: dark)">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c0643f'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23f6efe6'%3EZ%3C/text%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://firestore.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500&display=swap">
+  <meta name="theme-color" content="#faf6f2">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232d4a3a'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23faf6f2'%3EZ%3C/text%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/cormorant-garamond-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/cormorant-garamond-latin-wght-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/jost-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- HEADER -->
-  <header class="topbar">
-    <a class="brand" href="#top" aria-label="Zanzibar, torna all'inizio">
-      <svg class="brand-leaf" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22V11M12 11C10 6 6 4 2 5c3 1 6 3 10 6Zm0 0c2-5 6-7 10-6-3 1-6 3-10 6Zm0 0C9 8 5 9 3 12c3-1 6-1 9-1Zm0 0c3-3 7-2 9 1-3-1-6-1-9-1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="brand-text">
-        <span class="brand-name">Zanzibar</span>
-        <span class="brand-sub">Bar · Lounge</span>
-      </span>
-    </a>
-    <button class="burger" id="burger" aria-label="Apri menu del sito" aria-expanded="false" aria-controls="drawer">
-      <span></span><span></span><span></span>
-    </button>
+  <!-- TESTATA (come il menu stampato) -->
+  <header class="masthead" id="top">
+    <p class="kicker">Zanzibar</p>
+    <h1 class="macro-title" id="heroTitle">Menù Food</h1>
   </header>
 
-  <!-- TAB CATEGORIE -->
-  <nav class="tabs" id="tabs" aria-label="Categorie del menu"></nav>
+  <!-- CATEGORIE: barra fissa in alto durante lo scorrimento -->
+  <div class="catbar">
+    <nav class="tabs" id="tabs" aria-label="Categorie del menu"></nav>
+    <button class="burger" id="burger" aria-label="Apri informazioni sul locale" aria-expanded="false" aria-controls="drawer">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
 
   <!-- MENU -->
-  <main id="top" class="menu" aria-label="Menu">
+  <main class="menu" aria-label="Menu">
     <div id="menu"></div>
     <footer class="menu-foot">
-      <svg class="ornament" viewBox="0 0 120 12" aria-hidden="true"><path d="M0 6h48M72 6h48" stroke="currentColor" stroke-width=".8"/><path d="M60 1.5 64.5 6 60 10.5 55.5 6Z" fill="none" stroke="currentColor" stroke-width=".8"/></svg>
       <p>Prezzi IVA inclusa · Servizio al tavolo</p>
       <p>Per allergie e intolleranze chiedi al nostro staff.</p>
     </footer>
@@ -99,7 +93,6 @@
         <p class="sheet-desc" id="sheetDesc"></p>
         <div class="sheet-foot">
           <span class="sheet-price" id="sheetPrice"></span>
-          <span class="sheet-off" id="sheetOff" hidden>Non disponibile</span>
         </div>
       </div>
     </article>

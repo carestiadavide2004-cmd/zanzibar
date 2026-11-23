@@ -19,27 +19,35 @@
     return ((Number(a.order) || 0) - (Number(b.order) || 0)) || String(a.name).localeCompare(String(b.name), "it");
   }
 
-  // Trasforma i documenti di Firestore nel formato di data.js (categoria → voci)
+  // Trasforma i documenti di Firestore nel formato usato da app.js.
+  // Se le categorie non hanno ancora il campo "section" nel database c'è il vecchio menu di esempio:
+  // restituisce null e il sito mostra il menu vero scritto in data.js.
   function buildMenu(categories, items) {
+    if (!categories.some(function (c) { return typeof c.section === "string"; })) return null;
     return categories.slice().sort(byOrder).map(function (c) {
       return {
-        categoria: c.name,
-        voci: items.filter(function (v) { return v.categoryId === c.id; }).sort(byOrder).map(function (v) {
+        id: c.id,
+        name: c.name,
+        section: c.section,
+        note: c.note || "",
+        visible: c.visible !== false,
+        items: items.filter(function (v) { return v.categoryId === c.id; }).sort(byOrder).map(function (v) {
           return {
             id: v.id,
-            nome: v.name,
+            name: v.name,
             desc: v.description || "",
-            prezzo: Number(v.price) || 0,
-            tag: v.tag || "",
-            disponibile: v.available !== false
+            prices: Array.isArray(v.prices) ? v.prices : [],
+            symbol: v.symbol || "",
+            visible: v.visible !== false,
+            hasPhoto: v.hasPhoto === true
           };
         })
       };
-    }).filter(function (c) { return c.voci.length; });
+    });
   }
 
   function fail(err) {
-    console.warn("Firestore non raggiungibile, uso il menu di data.js.", err);
+    console.warn("Firestore non raggiungibile, uso il menu di data.js.", err && err.code);
     site.useFallbackMenu();
   }
 
@@ -57,7 +65,11 @@
     var categories = null;
     var items = null;
     var toList = function (snap) { return snap.docs.map(function (d) { return Object.assign({}, d.data(), { id: d.id }); }); };
-    var update = function () { if (categories && items) site.setMenu(buildMenu(categories, items)); };
+    var update = function () {
+      if (!categories || !items) return;
+      var menu = buildMenu(categories, items);
+      if (menu) site.setMenu(menu); else site.useFallbackMenu();
+    };
 
     // Foto dei prodotti (collezione "photos", un documento per voce): lette una per volta,
     // solo quando si apre la scheda di quel prodotto, e tenute in memoria per le riaperture.
