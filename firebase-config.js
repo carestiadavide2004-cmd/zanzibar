@@ -16,15 +16,15 @@ window.ZANZIBAR_FIREBASE_CONFIG = {
   projectId: "zanzibar-torredepasseri",
   storageBucket: "zanzibar-torredepasseri.firebasestorage.app",
   messagingSenderId: "481117642122",
-  appId: "1:481117642122:web:a52f8c95b1554e6258fc73",
-  measurementId: "G-KF013JBEX8"
+  appId: "1:481117642122:web:a52f8c95b1554e6258fc73"
 };
 
-/* Email del proprietario autorizzato ad accedere al pannello /admin.
-   (La sicurezza vera è nelle regole di Firestore: questo controllo
-   serve solo a mostrare subito un messaggio chiaro agli altri account.) */
-window.ZANZIBAR_ADMIN_EMAILS = [
-  "carestia.davide2004@gmail.com"
+/* UID dell'account autorizzato ad accedere al pannello /admin
+   (lo stesso scritto in firestore.rules). La sicurezza vera è nelle regole
+   di Firestore: questo controllo serve solo a mostrare subito un messaggio
+   chiaro a chi accede con un altro account. */
+window.ZANZIBAR_ADMIN_UIDS = [
+  "yFhDfv68LtUNvTAFlHcinSRU1mB2"
 ];
 
 /* true quando la configurazione qui sopra è stata compilata */

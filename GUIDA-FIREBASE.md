@@ -45,7 +45,7 @@ window.ZANZIBAR_FIREBASE_CONFIG = {
 3. Consigliato: **Impostazioni** (Settings) → **Azioni utente** (User actions) → togli la spunta a
    **Abilita creazione (registrazione)**, così nessun altro può creare account.
 4. Sempre in **Impostazioni → Domini autorizzati**: `localhost` è già presente. Quando pubblichi il sito,
-   aggiungi qui il tuo dominio (es. `menu.zanzibarlounge.it`). Se usi Firebase Hosting, i domini
+   aggiungi qui il tuo dominio (es. `menu.zanzibartorre.com`). Se usi Firebase Hosting, i domini
    `*.web.app` e `*.firebaseapp.com` sono già inclusi.
 
 ## 4. Crea l'utente amministratore (il proprietario)
@@ -54,11 +54,12 @@ window.ZANZIBAR_FIREBASE_CONFIG = {
 2. Inserisci l'email del proprietario e una password robusta (almeno 12 caratteri) → **Aggiungi utente**.
 3. Nella lista utenti copia il valore della colonna **UID utente** (una stringa tipo `Xy7Ab...`):
    serve al passaggio 5.
-4. Apri **`firebase-config.js`** e metti la stessa email in `ZANZIBAR_ADMIN_EMAILS`:
+4. Apri **`firebase-config.js`** e metti lo stesso UID in `ZANZIBAR_ADMIN_UIDS`
+   (niente email nel codice: il file è pubblico):
 
 ```js
-window.ZANZIBAR_ADMIN_EMAILS = [
-  "tua-email@esempio.it"
+window.ZANZIBAR_ADMIN_UIDS = [
+  "Xy7Ab..."
 ];
 ```
 
@@ -146,7 +147,7 @@ con la scritta "Non disponibile"; le categorie senza voci non compaiono sul sito
 |---|---|
 | "Collega Firebase" aprendo `/admin` | `firebase-config.js` contiene ancora i valori `INSERISCI_...` |
 | "Email o password non corretti" | Controlla l'utente in Authentication → Utenti, o usa "Password dimenticata?" |
-| "Questo account non è autorizzato" | L'email non è in `ZANZIBAR_ADMIN_EMAILS` |
+| "Questo account non è autorizzato" | L'UID dell'account non è in `ZANZIBAR_ADMIN_UIDS` |
 | "Permesso negato" al salvataggio | L'UID in `firestore.rules` non corrisponde al tuo, o le regole non sono state pubblicate |
 | "Dominio non autorizzato" | Aggiungi il dominio in Authentication → Impostazioni → Domini autorizzati |
 | Il sito mostra il menu di `data.js` e non quello del database | Il database non risponde entro 8 secondi (connessione assente) oppure il browser usa una versione vecchia della pagina: ricarica con Cmd+Shift+R |

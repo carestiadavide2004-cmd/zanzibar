@@ -5,12 +5,12 @@ Sito statico e leggerissimo, nessuna installazione. Il menu si gestisce dal **pa
 
 | File | A cosa serve |
 |---|---|
-| `data.js` | Testi, contatti, orari, foto, mappa. Il `menu` qui dentro è il **menù vero** (pulsante "Importa menù vero" del pannello) e la riserva se il database non risponde o contiene ancora il menù di esempio |
+| `data.js` | Testi, contatti, orari, dati legali (footer e privacy), mappa. Il `menu` qui dentro è il **menù vero** (pulsante "Importa menù vero" del pannello) e la riserva se il database non risponde o contiene ancora il menù di esempio |
 | `index.html` | Struttura della pagina |
 | `style.css` | Colori e stile, ripresi dal menù stampato (PDF): i colori sono in cima al file, in `:root` |
 | `fonts/` | Cormorant Garamond e Jost, ospitati nel sito (nessun font esterno) |
-| `app.js` | Logica (tab categorie, pannello hamburger, galleria, mappa) |
-| `firebase-config.js` | Chiavi Firebase ed email del proprietario |
+| `app.js` | Logica (tab categorie, pannello hamburger, aperto/chiuso, mappa al clic) |
+| `firebase-config.js` | Chiavi Firebase e UID dell'account del pannello |
 | `firebase-menu.js` | Legge il menu da Firestore in tempo reale e, solo quando si apre la scheda di un prodotto, la sua foto |
 | `admin/` | Pannello di amministrazione (login + gestione categorie, piatti e bevande) |
 | `firestore.rules`, `firebase.json` | Regole di sicurezza del database e configurazione Firebase Hosting |
@@ -36,8 +36,9 @@ Finché Firebase non risponde, o nel database c'è ancora il vecchio menù di es
 ## Aggiornare gli altri contenuti
 Apri `data.js` con un editor di testo:
 - **Etichette** facoltative delle voci: `tag: "Vegan"`, `tag: "Signature"`… (dal pannello: campo "Etichetta")
-- **Foto**: metti le immagini in una cartella `img/` e scrivi `src: "img/nomefoto.jpg"`. Consigliato: JPG/WebP larghe ~1000px, sotto i 200 KB. La prima foto è anche quella di "Chi siamo".
-- **Mappa**: nel campo `mappa` scrivi l'indirizzo reale o le coordinate (`"41.8902,12.4922"`).
+- **Orari**: `orari` per la tabella, `apertura` per "Aperto ora / Chiuso" (chiusura all'1:00 = giorno dopo).
+- **Mappa**: nel campo `mappa` c'è l'indirizzo cercato su Google Maps (solo dopo il clic su "Mostra la mappa").
+- **Dati legali**: in `legale` (ragione sociale, P.IVA, sede): li usano il footer e `privacy.html`.
 
 ## Provarlo in locale
 Senza Firebase basta aprire `index.html` nel browser. Con Firebase serve un indirizzo `http://`:

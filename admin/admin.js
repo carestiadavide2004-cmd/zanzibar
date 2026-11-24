@@ -16,7 +16,7 @@ import {
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
-const ADMIN_EMAILS = (window.ZANZIBAR_ADMIN_EMAILS || []).map((e) => e.trim().toLowerCase()).filter(Boolean);
+const ADMIN_UIDS = (window.ZANZIBAR_ADMIN_UIDS || []).map((u) => String(u).trim()).filter(Boolean);
 
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const byOrder = (a, b) => ((Number(a.order) || 0) - (Number(b.order) || 0)) || String(a.name).localeCompare(String(b.name), "it");
@@ -168,7 +168,7 @@ function start() {
       showView("login");
       return;
     }
-    if (ADMIN_EMAILS.length && !ADMIN_EMAILS.includes((user.email || "").toLowerCase())) {
+    if (ADMIN_UIDS.length && !ADMIN_UIDS.includes(user.uid)) {
       signOut(auth);
       loginMsg.classList.remove("is-ok");
       loginMsg.textContent = "Questo account non è autorizzato ad accedere al pannello.";

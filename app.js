@@ -241,7 +241,51 @@
 
   window.ZanzibarMenu = { setMenu: setMenu, useFallbackMenu: useFallbackMenu };
 
-  $("#navFoot").innerHTML = esc(D.info.indirizzo) + "<br>" + esc(D.info.telefono);
+  /* ---------- APERTO ORA / CHIUSO ----------
+     Legge D.apertura (0 = domenica). Se la chiusura è prima dell'apertura
+     (es. 06:00 – 01:00) il locale resta aperto fino all'1:00 del giorno dopo. */
+  var GIORNI_NOME = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+  var toMin = function (hhmm) { var p = String(hhmm).split(":"); return Number(p[0]) * 60 + Number(p[1] || 0); };
+  var hourText = function (hhmm) { return String(hhmm).replace(/^0(\d)/, "$1"); };
+  var alle = function (hhmm) { var h = hourText(hhmm); return (/^1:/.test(h) ? "all'" : "alle ") + h; };
+
+  function openState(now) {
+    var A = D.apertura || [];
+    var day = now.getDay(), mins = now.getHours() * 60 + now.getMinutes();
+    var y = A[(day + 6) % 7];
+    if (y && toMin(y[1]) <= toMin(y[0]) && mins < toMin(y[1])) return { open: true, until: y[1] };
+    var t = A[day];
+    if (t) {
+      var o = toMin(t[0]), c = toMin(t[1]);
+      if (mins >= o && (c <= o || mins < c)) return { open: true, until: t[1] };
+      if (mins < o) return { open: false, next: alle(t[0]) };
+    }
+    for (var i = 1; i <= 7; i++) {
+      var n = A[(day + i) % 7];
+      if (n) return { open: false, next: (i === 1 ? "domani " : GIORNI_NOME[(day + i) % 7] + " ") + alle(n[0]) };
+    }
+    return null;
+  }
+  function openText() {
+    var st = openState(new Date());
+    if (!st) return "";
+    return st.open
+      ? '<span class="dot is-open" aria-hidden="true"></span><strong>Aperto ora</strong> · fino ' + esc(alle(st.until))
+      : '<span class="dot" aria-hidden="true"></span><strong>Chiuso</strong> · apre ' + esc(st.next);
+  }
+  function renderOpenNow() {
+    var el = $("#openNow"), html = openText();
+    el.innerHTML = html + '<span class="open-addr">' + esc(D.info.indirizzo) + "<br>" + esc(D.info.riferimento || "") + "</span>";
+    el.hidden = false;
+  }
+  renderOpenNow();
+
+  /* ---------- FOOTER LEGALE ---------- */
+  var L = D.legale || {};
+  $("#legal").innerHTML =
+    "<p><strong>" + esc(D.info.nome) + " · " + esc(D.info.sottotitolo) + "</strong><br>" + esc(D.info.indirizzo) + "</p>" +
+    "<p>" + esc(L.ragioneSociale) + " · P.IVA " + esc(L.piva) + "<br>Sede legale: " + esc(L.sede) + "</p>" +
+    '<p><a href="privacy.html">Privacy</a></p>';
 
   /* ---------- PANNELLO HAMBURGER ---------- */
   var drawer = $("#drawer"), scrim = $("#scrim"), burger = $("#burger");
@@ -258,6 +302,7 @@
   }
 
   function openDrawer(view) {
+    renderOpenNow();
     scrim.hidden = false;
     requestAnimationFrame(function () { scrim.classList.add("is-open"); });
     drawer.classList.add("is-open");
@@ -323,56 +368,46 @@
   /* ---------- CONTENUTI (creati solo alla prima apertura = caricamento più veloce) ---------- */
   var builders = {
     about: function () {
-      var img = D.galleria[0];
       $("#about").innerHTML =
-        (img ? '<img class="about-hero" src="' + esc(img.src) + '" alt="' + esc(img.alt) + '" loading="lazy" decoding="async">' : "") +
         '<span class="eyebrow">' + esc(D.info.nome) + " · " + esc(D.info.sottotitolo) + "</span>" +
         D.info.chiSiamo.map(function (p, i) { return "<p" + (i === 0 ? ' class="lead"' : "") + ">" + esc(p) + "</p>"; }).join("");
     },
 
-    gallery: function () {
-      var g = $("#gallery");
-      g.innerHTML = D.galleria.map(function (f, i) {
-        return '<button data-i="' + i + '" aria-label="Ingrandisci: ' + esc(f.alt) + '"><img src="' + esc(f.src) + '" alt="' + esc(f.alt) + '" loading="lazy" decoding="async"></button>';
-      }).join("");
-      $$("img", g).forEach(function (im) {
-        if (im.complete) im.classList.add("is-loaded");
-        else im.addEventListener("load", function () { im.classList.add("is-loaded"); });
-      });
-      var lb = $("#lightbox"), lbImg = $("img", lb);
-      g.addEventListener("click", function (e) {
-        var b = e.target.closest("button");
-        if (!b) return;
-        var f = D.galleria[b.dataset.i];
-        lbImg.src = f.src.replace(/w=\d+/, "w=1200");
-        lbImg.alt = f.alt;
-        lb.hidden = false;
-      });
-      lb.addEventListener("click", function () { lb.hidden = true; lbImg.removeAttribute("src"); });
-    },
-
     contacts: function () {
       var I = D.info;
-      var tel = I.telefono.replace(/[^\d+]/g, "");
+      var wa = "https://wa.me/" + I.whatsapp + "?text=" + encodeURIComponent(I.whatsappMessaggio || "");
       $("#contacts").innerHTML =
-        '<div class="block"><h3>Orari di apertura</h3><table class="hours">' +
+        '<div class="block"><h3>Orari di apertura</h3><p class="open-line">' + openText() + '</p><table class="hours">' +
           D.orari.map(function (o) { return "<tr" + (isToday(o.giorni) ? ' class="is-today"' : "") + "><td>" + esc(o.giorni) + "</td><td>" + esc(o.ore) + "</td></tr>"; }).join("") +
         "</table></div>" +
-        '<div class="block"><h3>Indirizzo</h3><p>' + esc(I.indirizzo) + "</p></div>" +
-        '<div class="block"><h3>Contatti</h3><p>' + esc(I.telefono) + "<br>" + esc(I.email) + "</p>" +
-          '<div class="btn-row"><a class="btn btn-primary" href="tel:' + esc(tel) + '">Chiama</a>' +
-          '<a class="btn" href="mailto:' + esc(I.email) + '">Scrivici</a></div></div>' +
+        '<div class="block"><h3>Contatti</h3><p>' + esc(I.telefono) + "</p>" +
+          '<div class="btn-row"><a class="btn btn-primary" href="tel:' + esc(I.telefonoLink) + '">Chiama</a>' +
+          '<a class="btn" href="' + esc(wa) + '" target="_blank" rel="noopener">WhatsApp</a></div></div>' +
+        '<div class="block"><h3>Indirizzo</h3><p>' + esc(I.indirizzo) + "<br>" + esc(I.riferimento || "") + "</p></div>" +
         (I.social && I.social.length ? '<div class="block"><h3>Seguici</h3><div class="btn-row">' +
           I.social.map(function (s) { return '<a class="btn" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.nome) + "</a>"; }).join("") +
         "</div></div>" : "");
     },
 
+    // La mappa di Google si carica SOLO dopo il clic su "Mostra la mappa"
     map: function () {
       var q = encodeURIComponent(D.info.mappa || D.info.indirizzo);
-      $("#map").innerHTML =
-        '<iframe class="map-frame" title="Mappa di ' + esc(D.info.nome) + '" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=' + q + '&z=16&output=embed"></iframe>' +
-        "<p>" + esc(D.info.indirizzo) + "</p>" +
-        '<div class="btn-row"><a class="btn btn-primary" href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Apri in Google Maps</a></div>';
+      var box = $("#map");
+      box.innerHTML =
+        '<div class="map-box" id="mapBox">' +
+          '<p class="map-addr"><strong>' + esc(D.info.nome) + "</strong><br>" + esc(D.info.indirizzo) + "<br>" + esc(D.info.riferimento || "") + "</p>" +
+          '<button type="button" class="btn btn-primary" id="mapLoad">Mostra la mappa</button>' +
+          '<p class="map-note">Caricando la mappa, Google riceverà alcuni dati di navigazione.</p>' +
+        "</div>" +
+        '<div class="btn-row"><a class="btn" href="https://www.google.com/maps/search/?api=1&query=' + q + '" target="_blank" rel="noopener">Apri in Google Maps</a></div>';
+      $("#mapLoad").addEventListener("click", function () {
+        var f = document.createElement("iframe");
+        f.className = "map-frame";
+        f.title = "Mappa di " + D.info.nome;
+        f.referrerPolicy = "no-referrer-when-downgrade";
+        f.src = "https://maps.google.com/maps?q=" + q + "&z=16&output=embed";
+        $("#mapBox").replaceWith(f);
+      });
     }
   };
 

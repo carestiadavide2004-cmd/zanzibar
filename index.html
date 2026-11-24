@@ -3,15 +3,46 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="robots" content="noindex, nofollow">
-  <title>Zanzibar · Bar &amp; Lounge — Menu</title>
-  <meta name="description" content="Il menu di Zanzibar Bar & Lounge: caffetteria, colazioni, aperitivi, cocktail, snack e dolci.">
+  <title>Menù di Zanzibar · Coffee &amp; Lounge Bar a Torre de' Passeri</title>
+  <meta name="description" content="Menù di Zanzibar, Coffee &amp; Lounge Bar a Torre de' Passeri (PE), di fronte alla stazione: burger, panini, fritteria, taglieri per l'aperitivo, spritz e gin. Aperti tutti i giorni fino all'1:00.">
+  <link rel="canonical" href="https://menu.zanzibartorre.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="it_IT">
+  <meta property="og:site_name" content="Zanzibar · Coffee &amp; Lounge Bar">
+  <meta property="og:title" content="Menù di Zanzibar · Coffee &amp; Lounge Bar">
+  <meta property="og:description" content="Burger, panini, fritteria, aperitivi, spritz e gin a Torre de' Passeri, di fronte alla stazione.">
+  <meta property="og:url" content="https://menu.zanzibartorre.com/">
+  <meta property="og:image" content="https://menu.zanzibartorre.com/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Zanzibar · Coffee &amp; Lounge Bar — il menù">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="theme-color" content="#faf6f2">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232d4a3a'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='%23faf6f2'%3EZ%3C/text%3E%3C/svg%3E">
   <link rel="preload" href="fonts/cormorant-garamond-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/cormorant-garamond-latin-wght-italic.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/jost-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261124">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BarOrPub",
+    "name": "Zanzibar · Coffee & Lounge Bar",
+    "url": "https://zanzibartorre.com",
+    "hasMenu": "https://menu.zanzibartorre.com/",
+    "telephone": "+39 392 285 0875",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Viale della Repubblica 72 bis",
+      "postalCode": "65029",
+      "addressLocality": "Torre de' Passeri",
+      "addressRegion": "PE",
+      "addressCountry": "IT"
+    },
+    "openingHours": ["Mo-Sa 06:00-01:00", "Su 07:00-01:00"],
+    "sameAs": ["https://www.instagram.com/zanzibar_torre/", "https://www.facebook.com/zanzibarpub/"]
+  }
+  </script>
 </head>
 <body>
 
@@ -35,6 +66,7 @@
     <footer class="menu-foot">
       <p>Prezzi IVA inclusa · Servizio al tavolo</p>
       <p>Per allergie e intolleranze chiedi al nostro staff.</p>
+      <div class="legal" id="legal"></div>
     </footer>
   </main>
 
@@ -57,15 +89,19 @@
         <ul class="nav-list">
           <li><button data-go="menu"><em>01</em><span>Menu</span><small>Torna alla carta</small></button></li>
           <li><button data-go="about"><em>02</em><span>Chi siamo</span><small>Il nostro locale</small></button></li>
-          <li><button data-go="gallery"><em>03</em><span>Galleria</span><small>Uno sguardo all'atmosfera</small></button></li>
-          <li><button data-go="contacts"><em>04</em><span>Contatti &amp; orari</span><small>Telefono, social, aperture</small></button></li>
-          <li><button data-go="map"><em>05</em><span>Dove siamo</span><small>Mappa e indicazioni</small></button></li>
+          <li><button data-go="contacts"><em>03</em><span>Contatti &amp; orari</span><small>Telefono, WhatsApp, social</small></button></li>
+          <li><button data-go="map"><em>04</em><span>Dove siamo</span><small>Di fronte alla stazione</small></button></li>
         </ul>
+        <ul class="nav-links">
+          <li><a href="https://zanzibartorre.com" target="_blank" rel="noopener">Sito del bar</a></li>
+          <li><a href="https://zetacatering.com" target="_blank" rel="noopener">Zeta Catering</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+        </ul>
+        <p class="open-now" id="openNow" hidden></p>
         <p class="nav-foot" id="navFoot"></p>
       </nav>
 
       <section class="view" data-view="about" data-title="Chi siamo"><div id="about"></div></section>
-      <section class="view" data-view="gallery" data-title="Galleria"><div class="gallery" id="gallery"></div></section>
       <section class="view" data-view="contacts" data-title="Contatti & orari"><div id="contacts"></div></section>
       <section class="view" data-view="map" data-title="Dove siamo"><div id="map"></div></section>
     </div>
@@ -98,14 +134,9 @@
     </article>
   </div>
 
-  <!-- VISUALIZZATORE FOTO -->
-  <div class="lightbox" id="lightbox" hidden>
-    <img alt="">
-  </div>
-
-  <script src="firebase-config.js"></script>
-  <script src="data.js"></script>
-  <script src="app.js"></script>
-  <script src="firebase-menu.js"></script>
+  <script src="firebase-config.js?v=20261124"></script>
+  <script src="data.js?v=20261124"></script>
+  <script src="app.js?v=20261124"></script>
+  <script src="firebase-menu.js?v=20261124"></script>
 </body>
 </html>

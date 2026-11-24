@@ -12,28 +12,50 @@ window.ZANZIBAR = {
   /* ---------- INFO LOCALE ---------- */
   info: {
     nome: "Zanzibar",
-    sottotitolo: "Bar & Lounge",
+    sottotitolo: "Coffee & Lounge Bar",
     chiSiamo: [
-      "Zanzibar è il tuo angolo di esotico in città: un bar lounge dove i colori caldi della terracotta, il legno e il verde delle palme creano un'atmosfera rilassata, dalla colazione fino al dopocena.",
-      "Selezioniamo materie prime di qualità, prepariamo cocktail classici e signature, e serviamo aperitivi generosi da condividere. Siediti, rilassati, il viaggio comincia qui."
+      "Zanzibar è il Coffee & Lounge Bar di Torre de' Passeri, di fronte alla stazione.",
+      "Apriamo alle 6 del mattino per il caffè e la colazione, e chiudiamo all'una di notte: in mezzo panini, burger, fritti, taglieri per l'aperitivo, spritz e gin."
     ],
-    indirizzo: "Via delle Palme 12, 00100 Roma (RM)",
-    telefono: "+39 06 1234 5678",
-    email: "info@zanzibarlounge.it",
+    indirizzo: "Viale della Repubblica 72 bis, 65029 Torre de' Passeri (PE)", // VERIFICARE CAP
+    riferimento: "Di fronte alla stazione",
+    telefono: "+39 392 285 0875",
+    telefonoLink: "+393922850875",
+    whatsapp: "393922850875",
+    whatsappMessaggio: "Ciao Zanzibar! Vorrei un'informazione.",
     social: [
-      { nome: "Instagram", url: "https://instagram.com/" },
-      { nome: "Facebook",  url: "https://facebook.com/" }
+      { nome: "Instagram", url: "https://www.instagram.com/zanzibar_torre/" },
+      { nome: "Facebook",  url: "https://www.facebook.com/zanzibarpub/" }
     ],
-    // Testo usato per la mappa (indirizzo o coordinate "lat,lng")
-    mappa: "Colosseo, Roma"
+    // Testo cercato su Google Maps (solo dopo il clic su "Mostra la mappa")
+    mappa: "Viale della Repubblica 72 bis, 65029 Torre de' Passeri PE"
   },
 
-  /* ---------- ORARI ---------- */
+  /* ---------- DATI LEGALI (footer e privacy.html) ---------- */
+  legale: {
+    ragioneSociale: "[RAGIONE SOCIALE DA CONFERMARE]", // DA CONFERMARE
+    piva: "00000000000",                               // DA CONFERMARE
+    sede: "[SEDE LEGALE DA CONFERMARE]"                // DA CONFERMARE
+  },
+
+  /* ---------- ORARI ----------
+     orari: righe mostrate nella tabella.
+     apertura: orari usati per "Aperto ora / Chiuso", un elemento per giorno
+     (0 = domenica, 1 = lunedì … 6 = sabato). Se la chiusura è più piccola
+     dell'apertura (es. 01:00) vuol dire che si chiude dopo mezzanotte.
+     null = giorno di chiusura. */
   orari: [
-    { giorni: "Lunedì",            ore: "Chiuso" },
-    { giorni: "Martedì – Giovedì", ore: "07:00 – 00:00" },
-    { giorni: "Venerdì – Sabato",  ore: "07:00 – 02:00" },
-    { giorni: "Domenica",          ore: "08:00 – 00:00" }
+    { giorni: "Lunedì – Sabato", ore: "6:00 – 1:00" },
+    { giorni: "Domenica",        ore: "7:00 – 1:00" }
+  ],
+  apertura: [
+    ["07:00", "01:00"], // domenica
+    ["06:00", "01:00"], // lunedì
+    ["06:00", "01:00"], // martedì
+    ["06:00", "01:00"], // mercoledì
+    ["06:00", "01:00"], // giovedì
+    ["06:00", "01:00"], // venerdì
+    ["06:00", "01:00"]  // sabato
   ],
 
   /* ---------- MENU ----------
@@ -108,21 +130,6 @@ window.ZANZIBAR = {
       categoria: "Gin", sezione: "drink",
       voci: []
     }
-  ],
-
-  /* ---------- GALLERIA ----------
-     src: indirizzo della foto (link o file locale es. "img/sala.jpg")
-     alt: breve descrizione (per accessibilità)
-  */
-  galleria: [
-    { src: "https://images.pexels.com/photos/1581554/pexels-photo-1581554.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Sala interna con arredi in legno e rattan" },
-    { src: "https://images.pexels.com/photos/2789328/pexels-photo-2789328.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Due cocktail con menta al bancone" },
-    { src: "https://images.pexels.com/photos/941864/pexels-photo-941864.jpeg?auto=compress&cs=tinysrgb&w=700",   alt: "Bancone del bar con luci calde" },
-    { src: "https://images.pexels.com/photos/338713/pexels-photo-338713.jpeg?auto=compress&cs=tinysrgb&w=700",   alt: "Spritz all'arancia con rosmarino" },
-    { src: "https://images.pexels.com/photos/1304540/pexels-photo-1304540.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Negroni con scorza d'arancia" },
-    { src: "https://images.pexels.com/photos/2531189/pexels-photo-2531189.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Tagliere di formaggi per l'aperitivo" },
-    { src: "https://images.pexels.com/photos/2067628/pexels-photo-2067628.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Espresso in tazza gialla" },
-    { src: "https://images.pexels.com/photos/1283219/pexels-photo-1283219.jpeg?auto=compress&cs=tinysrgb&w=700", alt: "Bottiglie esposte dietro il bancone" }
   ],
 
   // Simbolo valuta mostrato accanto ai prezzi
